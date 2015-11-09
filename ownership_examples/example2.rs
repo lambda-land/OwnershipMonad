@@ -4,8 +4,8 @@
  compile with: $rustc example2.rs
 
  This example is less to illustrate the ownership concept in Rust
- and instead demonstrates the concept of Rust of Traits and their 
- similarity to type classes in Haskell. 
+ and instead demonstrates the concept of Traits in Rust 
+ and their similarity to Type Classes in Haskell. 
 
  The Haskell examples are taken from:
  http://learnyouahaskell.com/making-our-own-types-and-typeclasses#typeclasses-102 
@@ -28,11 +28,17 @@ enum TrafficLight {
 // type like ourself
 trait Eq 
 {
-    // Something that implemets the Eq trait would need to have a function 
-    fn is_equal(&self, TrafficLight) -> bool;
+    fn is_equal(&self, Self) -> bool;
 }
 
-/* This is a lot like a type class in Haskell 
+/* 
+  Something that implements the Eq trait would need to have a function `is_equal` defined to 
+  fully implement that trait.
+
+  `is_equal` is a function that takes a reference to self (hence the &self) 
+  and some other struct of the same type and returns a bool.
+  
+  This is a lot like a type class in Haskell:
 
    class Eq a where 
         isEqual :: a -> a -> Bool
@@ -42,8 +48,9 @@ trait Eq
 // Let's implement the Eq trait for TrafficLight
 impl Eq for TrafficLight 
 {
-    fn is_equal(&self, other: TrafficLight ) -> bool {
-        match (self, other) 
+    fn is_equal(&self, other: TrafficLight ) -> bool 
+    {
+        match (self, other) // match against a pair expression in this case
         {
             (&TrafficLight::Red,    TrafficLight::Red)     => true,  
             (&TrafficLight::Yellow, TrafficLight::Yellow)  => true,
@@ -75,9 +82,9 @@ impl Eq for TrafficLight
 */
 
 
-// Maing function for testing the above types
-fn main() 
-{
+// Main function for testing the above types
+fn main() {
+
     let light : TrafficLight = TrafficLight::Red;
     let other : TrafficLight = TrafficLight::Red;
 
