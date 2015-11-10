@@ -15,10 +15,13 @@
 
 use std::thread; // `use` brings names into scope and we're going to need the `thread` module
 use std::time::Duration;
+use std::sync::{Mutex, Arc};
 
 struct Philosopher 
 {
     name: String,
+    left: usize, // philosopher's left chopstick
+    right: usize // philosopher's right chopstick
 }
 
 /* This `impl` block lets us define things on the Philosopher struct type.
@@ -26,37 +29,74 @@ struct Philosopher
  * */
 impl Philosopher 
 {
-    fn new(name: &str) -> Philosopher 
+    fn new(name: &str, left: usize, right: usize) -> Philosopher 
     {
-        Philosopher { name: name.to_string(), } // This is the return statement for `new`
+        Philosopher { 
+            name: name.to_string(), 
+            left: left,
+            right: right,
+        } // This is the return statement for `new`
     }
 
-    fn eat(&self) 
+    fn eat(&self, table: &Table) 
     {
+        let _left = table.chopsticks[self.left].lock().unwrap();
+        // access the table's vector of chopsticks to get access to the Mutex at 
+        // that index and then call `lock()` on it and block until it becomes available
+        thread::sleep(Duration::from_millis(150));
+        let _right = table.chopsticks[self.right].lock().unwrap();
+
         println!("{} is eating.", self.name);
+
         thread::sleep(Duration::from_millis(1000)); 
         // calling `sleep` on the thread will simulate the time it takes to eat
+        
         println!("{} is done eating.", self.name);
     }
 }
 
+struct Table 
+{
+    // the table is made up of a vector of chopsticks 
+    chopsticks: Vec<Mutex<()>>,
+}
+
 fn main() {
-    // make a vector to store our philosopers
+
+    // make a new table and wrap it in an atomic reference count
+    let table = Arc::new(
+        Table 
+        {
+            chopsticks: vec![
+                    Mutex::new(()),
+                    Mutex::new(()),
+                    Mutex::new(()),
+                    Mutex::new(()),
+                    Mutex::new(()),
+                ]
+        }
+     );
+
+    // make a vector to store our philosophers
     let philosophers = vec![
-        Philosopher::new("Judith Butler"),
-        Philosopher::new("Gilles Deleuze"),
-        Philosopher::new("Karl Marx"),
-        Philosopher::new("Emma Goldman"),
-        Philosopher::new("Michel Foucault"),
+        Philosopher::new("Judith Butler", 0, 1),
+        Philosopher::new("Gilles Deleuze", 1, 2),
+        Philosopher::new("Karl Marx", 2, 3),
+        Philosopher::new("Emma Goldman", 3, 4),
+        Philosopher::new("Michel Foucault", 0, 4),
     ];
     
     // `handles` is a vector of threads
     let handles: Vec<_> = philosophers.into_iter().map(|p| {
+        let table = table.clone(); 
+        // The clone method on Arc<T> is what bumps up the reference count
+        // When it goes out of scope it decrements the count
+        
         thread::spawn(move || {
-            p.eat();
+            p.eat(&table);
         }) 
     }).collect();
-    /*  In last four lines we took our list of philosopers and called `into_iter()` on it.
+    /*  We took our list of philosopers and called `into_iter()` on it.
         This created an iterator that took ownership of each philosopher.
 
         We then call `map` on that iterator.
