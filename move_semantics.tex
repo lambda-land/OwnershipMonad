@@ -1,0 +1,42 @@
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+
+\begin{document}
+
+\vspace{2.0cm}
+
+\begin{center}
+    {\huge Formalized Move Semantics} 
+    \vspace{0.1in} \\
+    {\large Programming Research Group, Fall 2015} 
+    \vspace{0.1in} \\
+    {\large Michael McGirr} 
+    \vspace{0.1in} \\
+    {\large Oregon State University} 
+    \vspace{0.1in} \\
+    {\large Graduate School of Electrical Engineering and Computer Science}  
+\end{center}
+
+\vspace{1.0cm}
+
+\begin{enumerate}
+    \item There is only ever \textit{exactly one} binding to any given resource.
+
+    \item When a variable's lifetime goes out of scope the bound resources are freed.
+
+    \item We may transfer ownership to something else. The moved values are then
+          owned by something else.
+
+    \item A binding may be able to borrow a resource from another binding and
+          use it.
+
+    \item A binding may be able to mutate a resource that it borrows as long as
+          it has not been lent out to more than one binding.
+
+    \item More than one binding may borrow a resource but they may not mutate it.
+
+
+\end{enumerate}
+
+\end{document}
