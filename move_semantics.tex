@@ -23,13 +23,15 @@
 \begin{enumerate}
     \item There is only ever \textit{exactly one} binding to any given resource.
 
+    \item A variable owns what it is bound to.
+
     \item When a variable's lifetime goes out of scope the bound resources are freed.
 
     \item We may transfer ownership to something else. The moved values are then
           owned by something else.
 
     \item A binding may be able to borrow a resource from another binding and
-          use it.
+          use it before it returns it to the original scope.
 
     \item A binding may be able to mutate a resource that it borrows as long as
           it has not been lent out to more than one binding.
