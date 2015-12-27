@@ -1,0 +1,39 @@
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{multicol}
+
+\begin{document}
+
+\vspace{2.0cm}
+
+\begin{center}
+    {\huge Still untitled [Draft] } 
+    \vspace{0.4cm} \\
+    {\large Michael McGirr} 
+    \vspace{0.1cm} \\
+    {\large Oregon State University} 
+    \vspace{0.1cm} \\
+    {\large Graduate School of Electrical Engineering and Computer Science}  
+    \vspace{0.4cm} \\
+    {\large 2016 January}  
+\end{center}
+
+\vspace{1.0cm}
+
+\begin{multicols}{2}
+
+    \section*{Abstract}
+
+    This paper presents a type system that implements an ownership-style set of 
+    rules for resource management.  While it may seem at the onset to be 
+    unnecessary to define a system of rules governing resource management in 
+    Haskell, this specific module targets the IORef and State Monad. We will 
+    show some cases where this set of rules is necessary. 
+    
+    This ownership system introduces a set of rules that govern how, when, and
+    by whom a resource is available to be used.
+
+\end{multicols}
+
+\end{document}
