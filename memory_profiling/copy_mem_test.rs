@@ -3,7 +3,7 @@ use std::thread;
 use std::time::Duration;
 
 fn main() {
-    let data = Arc::new(Mutex::new([1, 1, 1]));
+    let data = Arc::new(Mutex::new(vec![1, 1, 1]));
 
     for i in 0..3 {
         // clone data
