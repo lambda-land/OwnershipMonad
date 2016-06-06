@@ -33,8 +33,12 @@
     \item A binding may be able to borrow a resource from another binding and
           use it before it returns it to the original scope.
 
-    \item A binding may be able to mutate a resource that it borrows as long as
-          it has not been lent out to more than one binding.
+    \item An owner may be able to mutate a resource as long as
+          it has not been lent out.
+
+    \item An borrower may be able to mutate a resource that it borrows as long as
+      it has not been lent out to any other variables. Only one mutable borrow of
+      a resource at a time.
 
     \item More than one binding may borrow a resource but they may not mutate it.
 
