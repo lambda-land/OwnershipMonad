@@ -98,14 +98,21 @@ hasBorrowers var (varMap, resMap)= do
 -- are created by taking the max id in the map and adding one to it.
 -- Removing Id's could mess this up.
 --
+--
 move :: Var -> Id -> Var -> State -> Maybe State
 move taker abandonedId owner (varMap, resMap) = do
  ownerId <- Map.lookup owner varMap
  _ <- Map.lookup ownerId resMap -- make sure the ownerId has an associated resource
  isBorrowed <- isResBorrowed ownerId (varMap, resMap)
- if isBorrowed
+ isTakerBorrowed <- isResBorrowed abandonedId (varMap, resMap)
+ if isBorrowed || isTakerBorrowed
    then Nothing
-   else return ((Map.delete owner (Map.insert taker ownerId varMap)), Map.insert abandonedId (0, Abandoned) resMap)
+   else do
+          (val, Owned _) <- Map.lookup ownerId resMap -- we need to get the value
+          let resMapAfterAbandonment = Map.insert abandonedId (0, Abandoned) resMap
+          let finalResMap = Map.insert ownerId (val, Owned taker) resMapAfterAbandonment
+          let finalVarMap = Map.delete owner (Map.insert taker ownerId varMap)
+          return (finalVarMap, finalResMap)
 
 
 -- | Run an operation and return the result
@@ -170,7 +177,11 @@ runCmd (SetVarVarMove newVar oldVar) (varMap, resMap) =
            else return (Map.insert newVar oldVarId (Map.delete oldVar varMap), resMap) -- delete the old variable from the varMap and insert the new variable
        Just newVarId -> do    -- The new variable already exists. What will happen in this case is in the runCmd's documentation
          _ <- Map.lookup oldVar varMap -- see if the oldVarId exists
-         move newVar newVarId oldVar (varMap, resMap) -- The oldVar does exists so run the move function
+         isNewVarBorrowed <- isResBorrowed newVarId (varMap, resMap) -- check if the new variables resource is being borrowed
+         if isNewVarBorrowed
+           then Nothing
+           else do
+                 move newVar newVarId oldVar (varMap, resMap) -- The oldVar does exists and the new variable is not being borrowed so run the move function
 
 runCmd (SetVarVarCopy newVar oldVar) (varMap, resMap) =
     case Map.lookup newVar varMap of -- see if the new variable already exists or not
@@ -215,26 +226,31 @@ runCmd (SetBorrowedFrom borrowerV ownerV) (varMap, resMap) =
         Owned v -> return (Map.insert borrowerV ownerVId varMap, Map.insert ownerVId (val, Borrowed v [borrowerV]) resMap)
         Borrowed v borrowerList -> return (Map.insert borrowerV ownerVId varMap, Map.insert ownerVId (val, Borrowed v (borrowerList ++ [borrowerV])) resMap)
         _ -> Nothing
-    Just borrowerVId -> do -- The borrower variable does exist
-      ownerVId <- Map.lookup ownerV varMap
-      (val, status) <- Map.lookup ownerVId resMap
-      let abandonedRes = (0, Abandoned)
-      let resMapAfterAbandonment = (Map.insert borrowerVId abandonedRes resMap) -- abandon the resource previously associated with the borrower
-      case status of
-        Owned v -> return (Map.insert borrowerV ownerVId varMap, Map.insert ownerVId (val, Borrowed v [borrowerV]) resMapAfterAbandonment)
-        Borrowed v borrowerList -> return (Map.insert borrowerV ownerVId varMap, Map.insert ownerVId (val, Borrowed v (borrowerList ++ [borrowerV])) resMapAfterAbandonment)
-        _ -> Nothing
+    Just borrowerVId -> do      -- The borrower variable exist
+      isWannabeBorrowerBeingBorrowed <- isResBorrowed borrowerVId (varMap, resMap) -- check if the new variable's (the one that wants to become a borrower) resource is being borrowed
+      if isWannabeBorrowerBeingBorrowed
+        then Nothing  -- if the variable already existed and it was being borrowed then it can't change
+        else do
+              ownerVId <- Map.lookup ownerV varMap
+              (val, status) <- Map.lookup ownerVId resMap
+              let abandonedRes = (0, Abandoned)
+              let resMapAfterAbandonment = (Map.insert borrowerVId abandonedRes resMap) -- abandon the resource previously associated with the borrower
+              case status of
+                Owned v -> return (Map.insert borrowerV ownerVId varMap, Map.insert ownerVId (val, Borrowed v [borrowerV]) resMapAfterAbandonment)
+                Borrowed v borrowerList -> return (Map.insert borrowerV ownerVId varMap, Map.insert ownerVId (val, Borrowed v (borrowerList ++ [borrowerV])) resMapAfterAbandonment)
+                _ -> Nothing
 
 runCmd (Drop var) (varMap, resMap) = do
-  isBorrowing <- isABorrower var (varMap, resMap)
-  -- TODO check if someone is borrowering the borrower? Is that possible?
-  varId <- Map.lookup var varMap
-  borrowerList <- getBorrowers varId (varMap, resMap)
+  isBorrowing <- isABorrower var (varMap, resMap) -- check if the varible to be dropped is borrowing a resource
+  varId <- Map.lookup var varMap -- get the variable to be dropped's id
   if isBorrowing
     then do   -- The variable is a borrower
-          let newBorrowers = (filter (/= var) borrowerList)
-          (i, Borrowed o _) <- Map.lookup varId resMap
-          return (Map.delete var varMap, Map.insert varId (i, Borrowed o newBorrowers) resMap) -- insert the new resource (sans the borrower we removed)
+          borrowerList <- getBorrowers varId (varMap, resMap) -- get the borrower list for this borrowed resource
+          let newBorrowers = (filter (/= var) borrowerList) -- borrower list with the dropped variable removed
+          (i, Borrowed o _) <- Map.lookup varId resMap -- get the value stored in the resource and the owner
+          case newBorrowers of
+            [] -> return (Map.delete var varMap, Map.insert varId (i, Owned o) resMap) -- insert the new resource (sans the borrower we removed) and since there was only one borrower, and it was dropped, the resource becomes owned
+            _  -> return (Map.delete var varMap, Map.insert varId (i, Borrowed o newBorrowers) resMap) -- insert the new resource (sans the borrower we removed)
     else do
          hasBorrowers <- isVarBorrowed var (varMap, resMap) -- See if the variable's resource has any borrowers
          if hasBorrowers
