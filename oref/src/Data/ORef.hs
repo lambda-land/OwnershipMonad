@@ -110,7 +110,7 @@ good = do
     readORef refX (writeORef refY)
     readORef refX (\x -> readORef refY (\y -> return (x,y)))
 
--- | Non-conflicting write.
+-- | Conflicting write.
 bad :: Own (Int,Int)
 bad = do
     refX <- newORef 3
