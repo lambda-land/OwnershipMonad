@@ -1,0 +1,7 @@
+*.hi
+*.o
+*.aux
+*.log
+*.swp
+TAGS
+.stack-work/
