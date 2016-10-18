@@ -9,12 +9,12 @@ Introduction
 
 STRef has the `readSTRef` function which copies the value in the STRef 
 into a pure context within the ST Monad. 
-The STRef which the pure value was recently read from can then be used in the 
+The STRef which the pure value was recently read from can then be used in
 ST by other functions. These functions are free to write to and modify the value
-in the STRef.  Because of this, it's not possible to know after the value is read
-from the STRef if the pure value is still the same as the *actual* value in the 
-STRef. After a `readSTRef` the subsequent pure value is reflective only of what 
-the STRef used to be. 
+in the STRef.  Because of this it's not possible to know after a value is read
+from an STRef if the pure value the read returns is still the same as the *actual*
+value in the STRef.  After a `readSTRef` the subsequent pure value is reflective
+only of what the STRef used to be. 
 
 While constantly reading (copying) the current contents of the STRef into a pure value
 before actions are taken based of this value is possible - this seems inefficient.
@@ -27,10 +27,10 @@ of the STRef. But with this approach we are restricted to operating on the value
 the STRef instead of reading it.
 
 Using a mutable reference that abides by Affine type rules allows us to say with
-certainty that the value read from an mutable reference is reflective of the contents
+certainty that the value read from a mutable reference is reflective of the contents
 of the resource that the reference refers to. Importantly we are allowed to read and
-modify the value in place rather than making numerous copies. We can do this since we 
-are bound by the Affine type rules.
+the value in place rather than making copies. We can do this since we are bound by 
+the Affine type rules.
 
 
 Design
