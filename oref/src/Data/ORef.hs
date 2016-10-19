@@ -23,6 +23,17 @@ newORef a = do
     put (new + 1, insert new (Entry True a) store)
     return (ORef new)
 
+-- | Copy the contents of one ORef to another
+copyORef :: ORef a -> Own (ORef a)
+copyORef (ORef oldORefID) = do
+  (new, store) <- get
+  setFlag oldORefID False
+  oldORefValue <- getValue oldORefID
+  guard oldORefValue
+  setFlag oldORefID True
+  put (new + 1, insert new (Entry True oldORefValue) store)
+  return (ORef new)
+
 -- | Read an ORef and use it in the given continuation.
 readORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
 readORef (ORef i) k = do
@@ -31,7 +42,7 @@ readORef (ORef i) k = do
     b <- k (value e)
     setFlag i (flag e)
     return b
-     
+
 -- | Write to an ORef or fail if it is not writeable.
 writeORef :: Typeable a => ORef a -> a -> Own ()
 writeORef (ORef i) a = do
