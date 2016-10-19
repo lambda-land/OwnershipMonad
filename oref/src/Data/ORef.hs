@@ -5,7 +5,7 @@ import Prelude hiding (lookup)
 import Control.Monad.State
 import Data.Typeable (Typeable,cast)
 
-import Data.IntMap (IntMap,empty,lookup,insert)
+import Data.IntMap (IntMap, empty, lookup, insert, delete)
 
 
 -- ** Public Interface
@@ -33,6 +33,21 @@ copyORef (ORef oldORefID) = do
   setFlag oldORefID True
   put (new + 1, insert new (Entry True oldORefValue) store)
   return (ORef new)
+
+-- | Move the contents of one ORef to a new ORef
+--   Remove the old ORef
+moveORef :: ORef a -> Own (ORef a)
+moveORef (ORef oldORefID) = do
+  (new, store) <- get
+  oldORefValue <- getValue oldORefID
+  guard oldORefValue
+  deleteEntry oldORefID
+  put (new + 1, insert new (Entry True oldORefValue) store)
+  return (ORef new)
+
+-- | Move the contents of one ORef to an existing ORef
+moveORef' :: ORef a -> ORef b -> Own ()
+moveORef' (ORef oldID) (ORef newID) = undefined
 
 -- | Read an ORef and use it in the given continuation.
 readORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
@@ -85,6 +100,10 @@ getEntry i = get >>= maybe err return . lookup i . snd
 -- | Set an entry in the store.
 setEntry :: Typeable a => ID -> Bool -> a -> Own ()
 setEntry i ok a = modifyStore (insert i (Entry ok a))
+
+-- | Delete an entry from the store.
+deleteEntry :: ID -> Own ()
+deleteEntry i = modifyStore (delete i)
 
 -- | Get the current writeable flag for an ORef.
 getFlag :: ID -> Own Bool
