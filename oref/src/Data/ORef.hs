@@ -10,7 +10,7 @@ import Data.IntMap (IntMap, empty, lookup, insert, delete)
 
 -- ** Public Interface
 
--- | A typed refence to an owned value.
+-- | A typed reference to an owned value.
 data ORef a = ORef ID
 
 -- | Ownership monad.
@@ -36,9 +36,12 @@ copyORef (ORef oldORefID) = do
 
 -- | Move the contents of one ORef to a new ORef
 --   Remove the old ORef
+--   This will fail if the old ORef has borrowers
 moveORef :: ORef a -> Own (ORef a)
 moveORef (ORef oldORefID) = do
   (new, store) <- get
+  oldORefOK <- getFlag oldORefID
+  guard oldORefOK -- make sure old ORef is writable/doesn't have borrowers
   oldORefValue <- getValue oldORefID
   guard oldORefValue
   deleteEntry oldORefID
@@ -46,8 +49,18 @@ moveORef (ORef oldORefID) = do
   return (ORef new)
 
 -- | Move the contents of one ORef to an existing ORef
+--   This will fail if either ORefs have borrowers
 moveORef' :: ORef a -> ORef b -> Own ()
-moveORef' (ORef oldID) (ORef newID) = undefined
+moveORef' (ORef oldID) (ORef newID) = do
+  oldORefOK <- getFlag oldID
+  guard oldORefOK -- make sure old ORef is writable/doesn't have borrowers
+  oldORefValue <- getValue oldID
+  guard oldORefValue
+  deleteEntry oldID
+  newORefOK <- getFlag newID
+  guard newORefOK -- make sure the new ORef is writable/doesn't have borrowers
+  setValue newID oldORefValue
+  return ()
 
 -- | Read an ORef and use it in the given continuation.
 readORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
@@ -58,7 +71,7 @@ readORef (ORef i) k = do
     setFlag i (flag e)
     return b
 
--- | Write to an ORef or fail if it is not writeable.
+-- | Write to an ORef or fail if it is not writable.
 writeORef :: Typeable a => ORef a -> a -> Own ()
 writeORef (ORef i) a = do
     ok <- getFlag i
