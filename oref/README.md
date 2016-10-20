@@ -1,11 +1,9 @@
-ORef
-====
+# ORef
 
 Mutable references that abide by Affine Logic.
 
 
-Introduction
-------------
+## Introduction
 
 STRef has the `readSTRef` function which copies the value in the STRef 
 into a pure context within the ST Monad. 
@@ -33,8 +31,7 @@ the value in place rather than making copies. We can do this since we are bound 
 the Affine type rules.
 
 
-Design
-------
+## Design
 
 
 ```haskell
@@ -87,6 +84,8 @@ Set the value in an ORef to a new value.
 
 -----
 
+### Borrows
+
 **TODO**
 
 Implementing borrows of ORefs will necessitate rewriting the current structure of the Store.
@@ -99,12 +98,13 @@ A borrow looks like a normal ORef and behave like one (with a few restrictions) 
 owning a resource (being bound directly as a variable to a resource) it points at the resource 
 owned by another ORef. 
 
-An *owner* ORef has to keep track of if it's being borrowed because if it is being borrowed it
-will not be able to mutate itself or go away.
+If an ORef is being borrowed it will not be able to mutate itself or go away. For that reason an 
+owner ORef has to keep track of whether or not it currently has any borrowers.
 
-The borrower should be able to mutate the resource if it is the only borrower.
+A borrower should be able to mutate the resource if it is the only borrower.
 
-**Question**: Is a borrow still a necessary component of an ORef as it is currently implemented?
+**Question**: 
+Is a borrow still a necessary component of an ORef as it is currently implemented?
 
 **Answer**:
 *I'm still considering this.*
@@ -114,15 +114,24 @@ either to read or to write to it, **without** having to copy it or take ownershi
 of it.
 
 But given that under the hood the Haskell runtime **isn't actually making a copy** 
-- the argument for including borrows loses some of its luster. 
+the argument for including borrows loses some of its luster.
 
 But if that were **not** the case, then including borrows would be important to include.
 
-If there are cases where we need to be able to read a value without copying or 
-moving ownership to ourselves - then borrows would be needed.
+The task then is to find cases where we need to be able to read a value 
+and if we were to make a copy to be able to read the value, we are *actually* making a copy. 
+A borrow, under these circumstatnces, would allow us to have access without copying or moving 
+ownership to ourselves.
 
 I'm more leaning towards **including** it since it would be useful for those latter cases. 
 The downside is that it would make using ORef's more complex.
+
+Idris's Uniqueness Types were [inspired by Rust](http://docs.idris-lang.org/en/latest/reference/uniqueness-types.html#uniqueness-types) 
+and they [felt that borrows were necessary.](http://docs.idris-lang.org/en/latest/reference/uniqueness-types.html#borrowed-types)
+
+
+
+**Previous borrowORef docs**
 
 ```haskell
 borrowORef :: ORef a -> Own (ORef a)
