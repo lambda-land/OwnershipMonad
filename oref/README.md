@@ -38,7 +38,7 @@ Design
 
 
 ```haskell
-newORef :: a -> Own (ORef a)
+newORef :: Typeable a => a -> Own (ORef a)
 ```
 
 Take a pure value and create an ORef with the value in it.
@@ -64,7 +64,68 @@ resource.
 
 
 ```haskell
-borrowORef :: ORef a -> (a -> Own b) -> Own (ORef b)
+moveORef' :: ORef a -> ORef b -> Own ()
+```
+
+Move the contents of one ORef to an existing ORef
+~~This will fail if either ORefs have borrowers~~
+
+
+```haskell
+readORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
+```
+
+Read an ORef and use it in the given continuation.
+
+
+```haskell
+writeORef :: ORef a -> a -> Own ()
+```
+
+Set the value in an ORef to a new value. 
+~~This can only occur if there are no borrowers or if it is the sole borrower of an ORef performing the write.~~
+
+-----
+
+**TODO**
+
+Implementing borrows of ORefs will necessitate rewriting the current structure of the Store.
+
+The basic idea behind a borrow is it is a way to create a temporary reference 
+to a resource owned by another ORef without taking the resource away permanently 
+from the owner. 
+
+A borrow looks like a normal ORef and behave like one (with a few restrictions) but instead of
+owning a resource (being bound directly as a variable to a resource) it points at the resource 
+owned by another ORef. 
+
+An *owner* ORef has to keep track of if it's being borrowed because if it is being borrowed it
+will not be able to mutate itself or go away.
+
+The borrower should be able to mutate the resource if it is the only borrower.
+
+**Question**: Is a borrow still a necessary component of an ORef as it is currently implemented?
+
+**Answer**:
+*I'm still considering this.*
+The main reason a borrow **would** be desired would be to make it possible to
+use the underlying resource (or even possibly borrow a portion of the resource), 
+either to read or to write to it, **without** having to copy it or take ownership 
+of it.
+
+But given that under the hood the Haskell runtime **isn't actually making a copy** 
+- the argument for including borrows loses some of its luster. 
+
+But if that were **not** the case, then including borrows would be important to include.
+
+If there are cases where we need to be able to read a value without copying or 
+moving ownership to ourselves - then borrows would be needed.
+
+I'm more leaning towards **including** it since it would be useful for those latter cases. 
+The downside is that it would make using ORef's more complex.
+
+```haskell
+borrowORef :: ORef a -> Own (ORef a)
 ```
 
 Borrowing an ORef is similar to moving an ORef but the borrower intends to return
@@ -82,19 +143,3 @@ only have read access to resource.
 
 The ORef being borrowed from tracks the number of borrowers it has by incrementing its
 count of borrowers.
-
-
-```haskell
-writeORef :: ORef a -> a -> Own ()
-```
-
-Set the value in an ORef to a new value. This can only occur if there are no 
-borrowers or if it is the sole borrower of an ORef performing the write.
-
-
-```haskell
-modifyORef :: ORef a -> (a -> a) -> Own ()
-```
-
-Apply a function on the value in the ORef. Like `writeORef`, this can only occur if there
-are no borrowers or if it is the sole borrower performing the operation.
