@@ -39,14 +39,13 @@ copyORef (ORef oldORefID) = do
 --   This will fail if the old ORef has borrowers
 moveORef :: ORef a -> Own (ORef a)
 moveORef (ORef oldORefID) = do
-  (new, store) <- get
   oldORefOK <- getFlag oldORefID
   guard oldORefOK -- make sure old ORef is writable/doesn't have borrowers
   oldORefValue <- getValue oldORefID
   guard oldORefValue
+  newORef <- copyORef (ORef oldORefID)
   deleteEntry oldORefID
-  put (new + 1, insert new (Entry True oldORefValue) store)
-  return (ORef new)
+  return newORef
 
 -- | Move the contents of one ORef to an existing ORef
 --   This will fail if either ORefs have borrowers
