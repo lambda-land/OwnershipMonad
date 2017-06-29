@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import Control.Concurrent.OChan
 
 main :: IO ()
-main = someFunc
+main = undefined
