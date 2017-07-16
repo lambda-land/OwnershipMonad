@@ -1,0 +1,44 @@
+name: ochan
+version: '0.1.0.0'
+synopsis: Owned channels
+description: Resource tracking channels
+category: Concurrency
+author: Mike McGirr
+maintainer: mcgirrm@oregonstate.edu
+copyright: 2017 Mike McGirr
+license: BSD3
+github: lambda-land/OwnershipMonad
+extra-source-files:
+  - README.md
+
+library:
+  source-dirs: src
+  ghc-options: -Wall
+  exposed-modules:
+    - Control.Concurrent.OChan
+  dependencies:
+    - base >=4.7 && <5
+
+executables:
+  ochan-exe:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - base
+      - ochan
+
+tests:
+  ochan-test:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - base
+      - ochan

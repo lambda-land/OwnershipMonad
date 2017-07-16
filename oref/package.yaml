@@ -1,0 +1,26 @@
+name: oref
+version: '0.0.0'
+category: Data
+author: Eric Walkingshaw
+maintainer: walkiner@oregonstate.edu
+license: BSD3
+github: lambda-land/OwnershipMonad
+extra-source-files:
+  - README.md
+
+default-extensions:
+  - ExistentialQuantification
+
+ghc-options:
+  - -W
+  - -Wredundant-constraints
+
+dependencies:
+  - base
+  - containers
+  - mtl
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Data.ORef
