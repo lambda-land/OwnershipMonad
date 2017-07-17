@@ -1,5 +1,5 @@
 name: oref
-version: '0.0.0'
+version: '0.0.1'
 category: Data
 author: Eric Walkingshaw
 maintainer: walkiner@oregonstate.edu
@@ -12,15 +12,15 @@ default-extensions:
   - ExistentialQuantification
 
 ghc-options:
-  - -W
+  - -Wall
   - -Wredundant-constraints
-
-dependencies:
-  - base
-  - containers
-  - mtl
 
 library:
   source-dirs: src
+  dependencies:
+    - base >= 4.8 && < 5
+    - containers
+    - mtl
   exposed-modules:
     - Data.ORef
+    - Data.ORef.Internal
