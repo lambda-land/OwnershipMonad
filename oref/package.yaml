@@ -15,12 +15,22 @@ ghc-options:
   - -Wall
   - -Wredundant-constraints
 
+dependencies:
+  - base >= 4.8 && < 5
+  - containers
+  - mtl
+
 library:
   source-dirs: src
-  dependencies:
-    - base >= 4.8 && < 5
-    - containers
-    - mtl
   exposed-modules:
     - Data.ORef
     - Data.ORef.Internal
+
+# Test suite
+tests:
+  test:
+    main: Main.hs
+    ghc-options: -Wall
+    source-dirs:
+      - src
+      - test

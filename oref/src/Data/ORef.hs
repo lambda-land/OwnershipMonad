@@ -4,7 +4,20 @@ Module: Data.ORef
 Internal types and functions
 -}
 
-module Data.ORef where
+module Data.ORef
+  (
+    -- types
+    ORef
+  , Own
+    -- functions
+  , evalOwn
+  , newORef
+  , copyORef
+  , moveORef
+  , moveORef'
+  , readORef
+  , writeORef
+  ) where
 
 import Prelude hiding (lookup)
 
@@ -43,9 +56,9 @@ moveORef (ORef oldORefID) = do
   guard oldORefOK -- make sure old ORef is writable/doesn't have borrowers
   oldORefValue <- getValue oldORefID
   guard oldORefValue
-  newORef <- copyORef (ORef oldORefID)
+  new <- copyORef (ORef oldORefID)
   deleteEntry oldORefID
-  return newORef
+  return new
 
 -- | Move the contents of one ORef to an existing ORef
 --   This will fail if either ORefs have borrowers
@@ -77,33 +90,3 @@ writeORef (ORef i) a = do
     guard ok
     setValue i a
 
-
-
--- ** Examples
-
--- | Non-conflicting write.
-good :: Own (Int,Int)
-good = do
-    refX <- newORef 3
-    refY <- newORef 5
-    readORef refX (writeORef refY)
-    readORef refX (\x -> readORef refY (\y -> return (x,y)))
-
--- | Conflicting write.
-bad :: Own (Int,Int)
-bad = do
-    refX <- newORef 3
-    refY <- newORef 5
-    readORef refX (writeORef refX)
-    readORef refX (\x -> readORef refY (\y -> return (x,y)))
-
-magic :: Int -> Maybe Int
-magic x = evalOwn $ do
-  ref <- newORef x
-  readORef ref (\a -> return (a + 1))
-
-darkMagic :: Int -> Maybe Int
-darkMagic x = evalOwn $ do
-  ref <- newORef x
-  readORef ref (\b -> writeORef ref b)
-  readORef ref (\a -> return (a + 1))
