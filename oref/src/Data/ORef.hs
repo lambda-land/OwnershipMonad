@@ -36,6 +36,7 @@ newORef a = do
     put (new + 1, insert new (Entry True a) store)
     return (ORef new)
 
+
 -- | Copy the contents of one ORef to another
 copyORef :: ORef a -> Own (ORef a)
 copyORef (ORef oldORefID) = do
