@@ -4,7 +4,21 @@ Module: Data.ORef.Internal
 Internal types and functions
 -}
 
-module Data.ORef.Internal where
+module Data.ORef.Internal
+  ( ORef(ORef)
+  , Own
+  , Entry(..)
+  -- maybe Entry should be exported in a different way
+  , flag
+  , value
+  , getEntry
+  , deleteEntry
+  , getFlag
+  , setFlag
+  , getValue
+  , setValue
+  , evalOwn
+  ) where
 
 import Prelude hiding (lookup)
 
