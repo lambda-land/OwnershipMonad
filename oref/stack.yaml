@@ -3,4 +3,4 @@
 
 # The resolver determines which packages are used to resolve the dependencies
 # in the Cabal build file.
-resolver: lts-8.21
+resolver: lts-8.23
