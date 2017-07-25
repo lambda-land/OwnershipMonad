@@ -13,24 +13,37 @@ import Control.Monad.Trans
 import Control.Concurrent.OChan
 import Data.ORef
 
-threadTask :: (Chan a) -> IO ()
-threadTask ch = do
-  oref <- lift $ readOChan ch
-  putStrLn "Just read an ORef from OChan"
-
-doubleWriteRefChan :: Own ()
-doubleWriteRefChan = do
+singleThreadedWrite :: Own ()
+singleThreadedWrite = do
   -- create an ORef in the context of this thread and ownership monad
   ref <- newORef ""
   -- write to it
   writeORef ref "Quark"
   ch <- newOChan
   writeOChan ch ref
+  -- TODO fixt writeOChan it does not work
   -- fork the thread
-  liftIO $ forkIO $ threadTask ch
-  -- Try writing to that ref again from the parent thread
   writeORef ref "Odo"
   -- ^^ writing to a ref that's no longer owned
+
+-- threadTask :: (Chan a) -> IO ()
+-- threadTask ch = do
+--   oref <- lift $ readOChan ch
+--   putStrLn "Just read an ORef from OChan"
+
+-- doubleWriteRefChan :: Own ()
+-- doubleWriteRefChan = do
+--   -- create an ORef in the context of this thread and ownership monad
+--   ref <- newORef ""
+--   -- write to it
+--   writeORef ref "Quark"
+--   ch <- newOChan
+--   writeOChan ch ref
+--   -- fork the thread
+--   writeORef ref "Odo"
+--   -- ^^ writing to a ref that's no longer owned
+--   liftIO $ forkIO $ threadTask ch
+--   -- Try writing to that ref again from the parent thread
 
 -- Why thread id is needed in Ownership context
 -- doubleWriteRefChan :: Own ()
@@ -68,4 +81,5 @@ doubleWriteRefChan = do
 
 main :: IO ()
 main = do
-  putStrLn "Test suite not yet implemented"
+  e <- evalOwn singleThreadedWrite
+  putStrLn $ "The example resulted in " ++ show e
