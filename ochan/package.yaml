@@ -13,8 +13,9 @@ extra-source-files:
 
 dependencies:
   - base >=4.7 && <5
-  - mtl
   - oref
+  - mtl == 2.2.1
+  - transformers
 
 library:
   source-dirs: src
@@ -25,7 +26,7 @@ library:
 # Test suite
 tests:
   test:
-    main: Spec.hs
+    main: Main.hs
     source-dirs:
       - src
       - test

@@ -18,7 +18,8 @@ ghc-options:
 dependencies:
   - base >= 4.8 && < 5
   - containers
-  - mtl
+  - mtl == 2.2.1
+  - transformers
 
 library:
   source-dirs: src
