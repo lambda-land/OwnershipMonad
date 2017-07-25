@@ -3,12 +3,7 @@ module Main where
 import Control.Concurrent
 import Control.Monad.IO.Class (liftIO)
 
-import Control.Monad.Trans
--- import Control.Monad.State
--- import Control.Monad.Trans.Maybe
-
--- import Control.Monad
--- import Data.Maybe
+import Data.Typeable
 
 import Control.Concurrent.OChan
 import Data.ORef
@@ -21,29 +16,33 @@ singleThreadedWrite = do
   writeORef ref "Quark"
   ch <- newOChan
   writeOChan ch ref
-  -- TODO fixt writeOChan it does not work
-  -- fork the thread
+  -- TODO fix writeOChan since it does not work
   writeORef ref "Odo"
   -- ^^ writing to a ref that's no longer owned
 
--- threadTask :: (Chan a) -> IO ()
--- threadTask ch = do
---   oref <- lift $ readOChan ch
---   putStrLn "Just read an ORef from OChan"
+threadTask :: Typeable a => (Chan a) -> IO ()
+threadTask ch = do
+  ex <- (evalOwn $ do
+               _ <- readOChan ch
+               return ()
+        )
+  case ex of
+    Nothing -> do putStrLn "Error"
+    Just () -> do putStrLn "Success"
 
--- doubleWriteRefChan :: Own ()
--- doubleWriteRefChan = do
---   -- create an ORef in the context of this thread and ownership monad
---   ref <- newORef ""
---   -- write to it
---   writeORef ref "Quark"
---   ch <- newOChan
---   writeOChan ch ref
---   -- fork the thread
---   writeORef ref "Odo"
---   -- ^^ writing to a ref that's no longer owned
---   liftIO $ forkIO $ threadTask ch
---   -- Try writing to that ref again from the parent thread
+chanTest :: Own ()
+chanTest = do
+  -- create an ORef in the context of this thread and ownership monad
+  ref <- newORef ""
+  -- write to it
+  writeORef ref "Quark"
+  -- create a channel
+  ch <- newOChan
+  -- write the ref to the channel (removing it from this context)
+  writeOChan ch ref
+  -- fork the thread
+  _ <- liftIO $ forkIO $ threadTask ch
+  return ()
 
 -- Why thread id is needed in Ownership context
 -- doubleWriteRefChan :: Own ()
@@ -60,26 +59,11 @@ singleThreadedWrite = do
 --     putStrLn "Just read an ORef from OChan"
 --   writeORef oref "Odo"
 
--- doubleWriteRefChan :: Own ()
--- doubleWriteRefChan = do
---   -- create an ORef in the context of this thread and ownership monad
---   ref <- newORef ""     -- ref :: (ORef a)
---   -- write to it
---   writeORef ref "Quark" -- Own ()
---   _ <- liftIO $ do
---     ch <- newOChan
---     -- send it along the channel
---     writeOChan ch ref     -- IO ()
---     -- fork the thread
---     forkIO $ do
---       -- read from the channel - this will consume that ref
---       _ <- readOChan ch
---       putStrLn "Just read an ORef from OChan"
---       -- Try writing to that ref again from the parent thread
---   writeORef ref "Odo"
---   -- ^^ writing to a ref that's no longer owned
-
 main :: IO ()
 main = do
-  e <- evalOwn singleThreadedWrite
-  putStrLn $ "The example resulted in " ++ show e
+  example1 <- evalOwn singleThreadedWrite
+  putStrLn "The example should result in Nothing"
+  putStrLn $ "The example resulted in " ++ show example1
+  example2 <- evalOwn chanTest
+  putStrLn "The example should result in Just ()"
+  putStrLn $ "The example resulted in " ++ show example2
