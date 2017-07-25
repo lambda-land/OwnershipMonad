@@ -11,13 +11,6 @@ import Control.Monad.IO.Class
 import Data.Typeable (Typeable)
 import Data.ORef
 
--- data Stream a = MVar (Item a)
--- data Item a   = Item a (Stream a)
-
--- data OChan a = OChan
---   (MVar (Stream (Own a)))
---   (MVar (Stream (Own a)))
-
 -- | A OChan is a channel within the context of the ownership monad
 type OChan a = Own (Chan a)
 
@@ -40,6 +33,7 @@ writeOChan' ch v = do
 writeOChan :: Typeable a => Chan a -> ORef a -> Own ()
 writeOChan ch oref = do
   readORef oref (writeOChan' ch)
+  dropORef oref
 
 -- |
 readOChan :: Typeable a => Chan a -> Own (ORef a)

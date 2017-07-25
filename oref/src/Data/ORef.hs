@@ -12,6 +12,7 @@ module Data.ORef
     -- functions
   , evalOwn
   , newORef
+  , dropORef
   , copyORef
   , moveORef
   , moveORef'
@@ -36,6 +37,13 @@ newORef a = do
     put (new + 1, insert new (Entry True a) store)
     return (ORef new)
 
+-- | remove an ORef from the current context
+dropORef :: ORef a -> Own ()
+dropORef (ORef oldORefID) = do
+  oldORefOK <- getFlag oldORefID
+  guard oldORefOK -- make sure old ORef is writable/doesn't have borrowers
+  setFlag oldORefID False
+  return ()
 
 -- | Copy the contents of one ORef to another
 copyORef :: ORef a -> Own (ORef a)
