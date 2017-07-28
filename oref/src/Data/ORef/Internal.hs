@@ -24,6 +24,7 @@ import Prelude hiding (lookup)
 
 import Control.Monad.State
 import Control.Monad.Trans.Maybe
+import Control.Concurrent
 
 import Data.Typeable (Typeable,cast)
 import Data.IntMap (IntMap, empty, lookup, insert, delete)
@@ -45,15 +46,21 @@ type Store = IntMap Entry
 
 -- | An entry in the store is a boolean flag indicating whether this ORef can
 --   be written to and a value of arbitrary type.
-data Entry = forall v. Typeable v => Entry Bool v
+data Entry = forall v. Typeable v => Entry Bool ThreadId v
 
 -- | The flag of an entry.
 flag :: Entry -> Bool
-flag (Entry ok _) = ok
+flag (Entry ok _ _) = ok
+
+-- | The flag of an entry.
+checkEntry :: Entry -> IO Bool
+checkEntry (Entry ok thrId _) = do
+  threadId <- myThreadId
+  return $ (threadId == thrId) && ok
 
 -- | The value of an entry casted to the expected type.
 value :: Typeable a => Entry -> a
-value (Entry _ v) = case cast v of
+value (Entry _ _ v) = case cast v of
     Just a  -> a
     Nothing -> error "internal cast error"
 
@@ -68,7 +75,9 @@ getEntry i = get >>= maybe err return . lookup i . snd
 
 -- | Set an entry in the store.
 setEntry :: Typeable a => ID -> Bool -> a -> Own ()
-setEntry i ok a = modifyStore (insert i (Entry ok a))
+setEntry i ok a = do
+  thrId <- liftIO $ myThreadId
+  modifyStore (insert i (Entry ok thrId a))
 
 -- | Delete an entry from the store.
 deleteEntry :: ID -> Own ()
@@ -81,7 +90,7 @@ getFlag i = fmap flag (getEntry i)
 -- | Set the current writeable flag for an ORef.
 setFlag :: ID -> Bool -> Own ()
 setFlag i ok = do
-    Entry _ a <- getEntry i
+    Entry _ _ a <- getEntry i
     setEntry i ok a
 
 -- | Get the current value of an ORef.

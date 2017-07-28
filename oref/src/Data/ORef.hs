@@ -27,6 +27,7 @@ import Data.ORef.Internal
 import Control.Monad.State
 import Data.Typeable (Typeable)
 import Data.IntMap (insert)
+import Control.Concurrent (myThreadId)
 
 -- ** Public Interface
 
@@ -34,7 +35,8 @@ import Data.IntMap (insert)
 newORef :: Typeable a => a -> Own (ORef a)
 newORef a = do
     (new,store) <- get
-    put (new + 1, insert new (Entry True a) store)
+    thrId <- liftIO $ myThreadId
+    put (new + 1, insert new (Entry True thrId a) store)
     return (ORef new)
 
 -- | remove an ORef from the current context
@@ -53,7 +55,8 @@ copyORef (ORef oldORefID) = do
   oldORefValue <- getValue oldORefID
   guard oldORefValue
   setFlag oldORefID True
-  put (new + 1, insert new (Entry True oldORefValue) store)
+  thrId <- liftIO $ myThreadId
+  put (new + 1, insert new (Entry True thrId oldORefValue) store)
   return (ORef new)
 
 -- | Move the contents of one ORef to a new ORef
