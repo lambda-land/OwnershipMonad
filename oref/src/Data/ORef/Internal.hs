@@ -8,7 +8,6 @@ module Data.ORef.Internal
   ( ORef(ORef)
   , Own
   , Entry(..)
-  -- maybe Entry should be exported in a different way
   , flag
   , value
   , getEntry
@@ -52,7 +51,8 @@ data Entry = forall v. Typeable v => Entry Bool ThreadId v
 flag :: Entry -> Bool
 flag (Entry ok _ _) = ok
 
--- | The flag of an entry.
+-- | check the flag of an entry and if the thread ID of the
+-- current thread matches the thread of the oref.
 checkEntry :: Entry -> IO Bool
 checkEntry (Entry ok thrId _) = do
   threadId <- myThreadId
