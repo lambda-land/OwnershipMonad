@@ -55,20 +55,13 @@ dropORef (ORef oldORefID) = do
 
 -- | Copy the contents of one ORef to another.
 --
--- TODO a child thread should not be able to copy from its parent
--- Still allow copies but make sure the thread id is the same
+-- A child thread should not be able to copy from its parent.
+-- As long as the threadId is the same copies of an ORef can be made.
 copyORef :: Typeable a => ORef a -> Own (ORef a)
 copyORef (ORef oldORefID) = do
   (new, store) <- get
   entry <- getEntry oldORefID
   oldORefOK <- liftIO $ checkEntry entry
-
-  -- setFlag oldORefID False -- TODO Check if this is this needed
-  -- oldORefValue <- getValue oldORefID
-  -- setFlag oldORefID True -- TODO Check if is this needed too.
-  -- thrId <- liftIO $ myThreadId
-  -- put (new + 1, insert new (Entry True thrId oldORefValue) store)
-
   put (new + 1, insert new entry store)
   setFlag new True
   return (ORef new)
@@ -81,7 +74,6 @@ moveORef (ORef oldORefID) = do
   entry <- getEntry oldORefID
   ok <- liftIO $ checkEntry entry
   guard ok -- make sure old ORef is writable and doesn't have borrowers
-  -- oldORefValue <- getValue oldORefID
   new <- copyORef (ORef oldORefID)
   dropORef (ORef oldORefID)
   -- if we cared about memory we would want to garbage collect/delete instead
@@ -95,10 +87,8 @@ moveORef' (ORef oldORefID) (ORef newORefID) = do
   entry <- getEntry oldORefID
   ok <- liftIO $ checkEntry entry
   guard ok -- make sure old ORef is writable/doesn't have borrowers
-
   oldORefValue <- getValue oldORefID
   dropORef (ORef oldORefID)
-
   -- now check that we can write to the oref that we are moving to.
   newORefEntry <- getEntry newORefID
   newORefOK <- liftIO $ checkEntry newORefEntry
