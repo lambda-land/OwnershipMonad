@@ -9,10 +9,11 @@ module Data.ORef.Internal
   , Own
   , Entry(..)
   , flag
+  , getFlag
   , value
   , getEntry
   , deleteEntry
-  , getFlag
+  , checkEntry
   , setFlag
   , getValue
   , setValue
@@ -51,8 +52,10 @@ data Entry = forall v. Typeable v => Entry Bool ThreadId v
 flag :: Entry -> Bool
 flag (Entry ok _ _) = ok
 
--- | check the flag of an entry and if the thread ID of the
--- current thread matches the thread of the oref.
+-- | This will check the flag of an entry and whether or not the thread ID of the
+-- current thread matches the thread specified in the ORef. This is to prevent a
+-- child from using ORef's that it inherited from its parent but was not
+-- explicitely given.
 checkEntry :: Entry -> IO Bool
 checkEntry (Entry ok thrId _) = do
   threadId <- myThreadId
@@ -98,6 +101,8 @@ getValue :: Typeable a => ID -> Own a
 getValue i = fmap value (getEntry i)
 
 -- | Set the current value of an ORef.
+--
+-- This will set the value - it will __not__ check ownership or thread
 setValue :: Typeable a => ID -> a -> Own ()
 setValue i a = do
     ok <- getFlag i
