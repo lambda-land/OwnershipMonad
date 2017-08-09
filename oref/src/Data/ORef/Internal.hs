@@ -14,6 +14,7 @@ module Data.ORef.Internal
   , getEntry
   , deleteEntry
   , checkEntry
+  , checkThreadId
   , setFlag
   , getValue
   , setValue
@@ -60,6 +61,11 @@ checkEntry :: Entry -> IO Bool
 checkEntry (Entry ok thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && ok
+
+checkThreadId :: Entry -> IO Bool
+checkThreadId (Entry _ thrId _) = do
+  threadId <- myThreadId
+  return $ (threadId == thrId)
 
 -- | The value of an entry casted to the expected type.
 value :: Typeable a => Entry -> a

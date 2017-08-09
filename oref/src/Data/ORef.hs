@@ -53,17 +53,24 @@ dropORef (ORef oldORefID) = do
   setFlag oldORefID False
   return ()
 
--- | Copy the contents of one ORef to another
+-- | Copy the contents of one ORef to another.
 --
--- TODO decide if a child thread copy a value from its parents thread
+-- TODO a child thread should not be able to copy from its parent
+-- Still allow copies but make sure the thread id is the same
 copyORef :: Typeable a => ORef a -> Own (ORef a)
 copyORef (ORef oldORefID) = do
   (new, store) <- get
-  setFlag oldORefID False
-  oldORefValue <- getValue oldORefID
-  setFlag oldORefID True
-  thrId <- liftIO $ myThreadId
-  put (new + 1, insert new (Entry True thrId oldORefValue) store)
+  entry <- getEntry oldORefID
+  oldORefOK <- liftIO $ checkEntry entry
+
+  -- setFlag oldORefID False -- TODO Check if this is this needed
+  -- oldORefValue <- getValue oldORefID
+  -- setFlag oldORefID True -- TODO Check if is this needed too.
+  -- thrId <- liftIO $ myThreadId
+  -- put (new + 1, insert new (Entry True thrId oldORefValue) store)
+
+  put (new + 1, insert new entry store)
+  setFlag new True
   return (ORef new)
 
 -- | Move the contents of one ORef to a new ORef.
@@ -72,11 +79,13 @@ copyORef (ORef oldORefID) = do
 moveORef :: Typeable a => ORef a -> Own (ORef a)
 moveORef (ORef oldORefID) = do
   entry <- getEntry oldORefID
-  oldORefOK <- liftIO $ checkEntry entry
-  guard oldORefOK -- make sure old ORef is writable and doesn't have borrowers
-  oldORefValue <- getValue oldORefID
+  ok <- liftIO $ checkEntry entry
+  guard ok -- make sure old ORef is writable and doesn't have borrowers
+  -- oldORefValue <- getValue oldORefID
   new <- copyORef (ORef oldORefID)
   dropORef (ORef oldORefID)
+  -- if we cared about memory we would want to garbage collect/delete instead
+  -- of just dropping it from the context
   return new
 
 -- | Move the contents of one ORef to an existing ORef.
@@ -84,16 +93,19 @@ moveORef (ORef oldORefID) = do
 moveORef' :: ORef a -> ORef b -> Own ()
 moveORef' (ORef oldORefID) (ORef newORefID) = do
   entry <- getEntry oldORefID
-  oldORefOK <- liftIO $ checkEntry entry
-  guard oldORefOK -- make sure old ORef is writable/doesn't have borrowers
+  ok <- liftIO $ checkEntry entry
+  guard ok -- make sure old ORef is writable/doesn't have borrowers
+
   oldORefValue <- getValue oldORefID
   dropORef (ORef oldORefID)
+
   -- now check that we can write to the oref that we are moving to.
   newORefEntry <- getEntry newORefID
   newORefOK <- liftIO $ checkEntry newORefEntry
   guard newORefOK -- make sure the new ORef is writable/doesn't have borrowers
   setValue newORefID oldORefValue
   return ()
+
 
 -- | Read an ORef and use it in the given continuation.
 --
