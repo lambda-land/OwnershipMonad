@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 {- |
 Module: Data.ORef.Internal
 
@@ -31,7 +33,8 @@ import Data.Typeable (Typeable,cast)
 import Data.IntMap (IntMap, empty, lookup, insert, delete)
 
 -- | A typed reference to an owned value.
-data ORef a = ORef ID
+data ORef a where
+  ORef :: Typeable a => ID -> ORef a
 
 -- | Ownership monad.
 -- type Own a = StateT (ID,Store) Maybe a
@@ -103,14 +106,14 @@ setFlag i ok = do
     setEntry i ok a
 
 -- | Get the current value of an ORef.
-getValue :: Typeable a => ID -> Own a
-getValue i = fmap value (getEntry i)
+getValue :: Typeable a => ORef a -> Own a
+getValue (ORef i) = fmap value (getEntry i)
 
 -- | Set the current value of an ORef.
 --
 -- This will set the value - it will __not__ check ownership or thread
-setValue :: Typeable a => ID -> a -> Own ()
-setValue i a = do
+setValue :: Typeable a => ORef a -> a -> Own ()
+setValue (ORef i) a = do
     ok <- getFlag i
     setEntry i ok a
 

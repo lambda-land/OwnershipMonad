@@ -70,30 +70,30 @@ copyORef (ORef oldORefID) = do
 -- Remove the old ORef.
 -- This will fail if the old ORef has borrowers.
 moveORef :: Typeable a => ORef a -> Own (ORef a)
-moveORef (ORef oldORefID) = do
+moveORef oldORef@(ORef oldORefID) = do
     entry <- getEntry oldORefID
     ok <- liftIO $ checkEntry entry
     guard ok -- make sure old ORef is writable and doesn't have borrowers
-    new <- copyORef (ORef oldORefID)
-    dropORef (ORef oldORefID)
+    new <- copyORef oldORef
+    dropORef oldORef
     -- if we cared about memory we would want to garbage collect/delete instead
     -- of just dropping it from the context
     return new
 
 -- | Move the contents of one ORef to an existing ORef.
 -- This will fail if either ORefs have borrowers
-moveORef' :: ORef a -> ORef b -> Own ()
-moveORef' (ORef oldORefID) (ORef newORefID) = do
+moveORef' :: ORef a -> ORef a -> Own ()
+moveORef' oldORef@(ORef oldORefID) newORef@(ORef newORefID) = do
     entry <- getEntry oldORefID
     ok <- liftIO $ checkEntry entry
     guard ok -- make sure old ORef is writable/doesn't have borrowers
-    oldORefValue <- getValue oldORefID
-    dropORef (ORef oldORefID)
+    oldORefValue <- getValue oldORef
+    dropORef oldORef
     -- now check that we can write to the oref that we are moving to.
     newORefEntry <- getEntry newORefID
     newORefOK <- liftIO $ checkEntry newORefEntry
     guard newORefOK -- make sure the new ORef is writable/doesn't have borrowers
-    setValue newORefID oldORefValue
+    setValue newORef oldORefValue
     return ()
 
 
@@ -113,8 +113,8 @@ readORef (ORef i) k = do
 
 -- | Write to an ORef or fail if it is not writable.
 writeORef :: Typeable a => ORef a -> a -> Own ()
-writeORef (ORef i) a = do
+writeORef oref@(ORef i) a = do
     entry <- getEntry i
     ok <- liftIO $ checkEntry entry
     guard ok
-    setValue i a
+    setValue oref a
