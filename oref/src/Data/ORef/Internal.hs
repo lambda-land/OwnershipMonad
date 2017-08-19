@@ -81,41 +81,41 @@ modifyStore :: (Store -> Store) -> Own ()
 modifyStore f = modify (\(n,s) -> (n, f s))
 
 -- | Get an entry from the store or fail if no such entry exists.
-getEntry :: ID -> Own Entry
-getEntry i = get >>= maybe err return . lookup i . snd
+getEntry :: ORef a -> Own Entry
+getEntry (ORef i) = get >>= maybe err return . lookup i . snd
   where err = error ("entry not found: " ++ show i)
 
 -- | Set an entry in the store.
-setEntry :: Typeable a => ID -> Bool -> a -> Own ()
-setEntry i ok a = do
+setEntry :: ORef a -> Bool -> a -> Own ()
+setEntry (ORef i) ok a = do
   thrId <- liftIO $ myThreadId
   modifyStore (insert i (Entry ok thrId a))
 
 -- | Delete an entry from the store.
-deleteEntry :: ID -> Own ()
-deleteEntry i = modifyStore (delete i)
+deleteEntry :: ORef a -> Own ()
+deleteEntry (ORef i) = modifyStore (delete i)
 
 -- | Get the current writeable flag for an ORef.
-getFlag :: ID -> Own Bool
-getFlag i = fmap flag (getEntry i)
+getFlag :: ORef a -> Own Bool
+getFlag oref = fmap flag (getEntry oref)
 
 -- | Set the current writeable flag for an ORef.
-setFlag :: ID -> Bool -> Own ()
-setFlag i ok = do
-    Entry _ _ a <- getEntry i
-    setEntry i ok a
+setFlag :: Typeable a => ORef a -> Bool -> Own ()
+setFlag oref ok = do
+    a <- getValue oref
+    setEntry oref ok a
 
 -- | Get the current value of an ORef.
 getValue :: Typeable a => ORef a -> Own a
-getValue (ORef i) = fmap value (getEntry i)
+getValue oref = fmap value (getEntry oref)
 
 -- | Set the current value of an ORef.
 --
 -- This will set the value - it will __not__ check ownership or thread
-setValue :: Typeable a => ORef a -> a -> Own ()
-setValue (ORef i) a = do
-    ok <- getFlag i
-    setEntry i ok a
+setValue :: ORef a -> a -> Own ()
+setValue oref a = do
+    ok <- getFlag oref
+    setEntry oref ok a
 
 -- | Run an action in the ownership monad and return its result.
 -- evalOwn :: Own a -> Maybe a
