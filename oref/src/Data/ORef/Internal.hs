@@ -30,7 +30,7 @@ import Control.Monad.Trans.Maybe
 import Control.Concurrent
 
 import Data.Typeable (Typeable,cast)
-import Data.IntMap (IntMap, empty, lookup, insert, delete)
+import Data.IntMap (IntMap, empty, lookup, insert, delete, adjust)
 
 -- | A typed reference to an owned value.
 data ORef a where
@@ -55,6 +55,10 @@ data Entry = forall v. Typeable v => Entry Bool ThreadId v
 -- | The flag of an entry.
 flag :: Entry -> Bool
 flag (Entry ok _ _) = ok
+
+-- | Adjust the flag of an Entry to the given flag
+setEntryFlag :: Bool -> Entry -> Entry
+setEntryFlag ok (Entry _ t a) = (Entry ok t a)
 
 -- | This will check the flag of an entry and whether or not the thread ID of the
 -- current thread matches the thread specified in the ORef. This is to prevent a
@@ -91,6 +95,12 @@ setEntry (ORef i) ok a = do
   thrId <- liftIO $ myThreadId
   modifyStore (insert i (Entry ok thrId a))
 
+-- | Adjust an entry in current store
+--
+-- This is similiar to modifyStore
+adjustEntry :: ORef a -> (Entry -> Entry) -> Own ()
+adjustEntry (ORef i) k = modifyStore (adjust k i)
+
 -- | Delete an entry from the store.
 deleteEntry :: ORef a -> Own ()
 deleteEntry (ORef i) = modifyStore (delete i)
@@ -99,11 +109,10 @@ deleteEntry (ORef i) = modifyStore (delete i)
 getFlag :: ORef a -> Own Bool
 getFlag oref = fmap flag (getEntry oref)
 
+-- | Set the Boolean Flag of an ORef in t
 -- | Set the current writeable flag for an ORef.
-setFlag :: Typeable a => ORef a -> Bool -> Own ()
-setFlag oref ok = do
-    a <- getValue oref
-    setEntry oref ok a
+setFlag :: ORef a -> Bool -> Own ()
+setFlag oref ok = adjustEntry oref (setEntryFlag ok)
 
 -- | Get the current value of an ORef.
 getValue :: Typeable a => ORef a -> Own a
