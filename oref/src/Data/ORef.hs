@@ -87,8 +87,8 @@ moveORef oldORef = do
 -- | Move the contents of one ORef to an existing ORef.
 --
 -- This will fail if either ORefs have borrowers
-moveORef' :: ORef a -> ORef a -> Own ()
-moveORef' oORef nORef@(ORef newORefID) = do
+moveORef' :: Typeable a => ORef a -> ORef a -> Own ()
+moveORef' oORef nORef = do
     entry <- getEntry oORef
     ok <- liftIO $ checkEntry entry
     guard ok -- make sure old ORef is writable/doesn't have borrowers
