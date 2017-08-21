@@ -11,12 +11,13 @@ module Data.ORef.Internal
   , Own
   , Entry(..)
   , flag
-  , getFlag
-  , value
-  , getEntry
-  , deleteEntry
+  , setEntryFlag
   , checkEntry
   , checkThreadId
+  , value
+  , getEntry
+  -- , deleteEntry
+  , getFlag
   , setFlag
   , getValue
   , setValue
@@ -58,7 +59,7 @@ flag (Entry ok _ _) = ok
 
 -- | Adjust the flag of an Entry to the given flag
 setEntryFlag :: Bool -> Entry -> Entry
-setEntryFlag ok (Entry _ t a) = (Entry ok t a)
+setEntryFlag b (Entry _ t a) = (Entry b t a)
 
 -- | This will check the flag of an entry and whether or not the thread ID of the
 -- current thread matches the thread specified in the ORef. This is to prevent a

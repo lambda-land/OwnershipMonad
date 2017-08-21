@@ -45,7 +45,7 @@ newORef a = do
 -- not own. For that reason a child thread does not have
 -- The ability to change oref's it can see but are owned
 -- by the parent thread.
-dropORef :: Typeable a => ORef a -> Own ()
+dropORef :: ORef a -> Own ()
 dropORef oref = do
     entry <- getEntry oref
     ok <- liftIO $ checkEntry entry
@@ -63,12 +63,15 @@ copyORef oref = do
     entry <- getEntry oref
     ok <- liftIO $ checkThreadId entry
     guard ok
-    put (new + 1, insert new entry store)
-    setFlag (ORef new) True -- TODO fix this
+    let newEntry = setEntryFlag True entry
+    put (new + 1, insert new newEntry store)
     return (ORef new)
 
+
 -- | Move the contents of one ORef to a new ORef.
+--
 -- Remove the old ORef.
+--
 -- This will fail if the old ORef has borrowers.
 moveORef :: Typeable a => ORef a -> Own (ORef a)
 moveORef oldORef = do
@@ -82,9 +85,10 @@ moveORef oldORef = do
     return new
 
 -- | Move the contents of one ORef to an existing ORef.
+--
 -- This will fail if either ORefs have borrowers
 moveORef' :: ORef a -> ORef a -> Own ()
-moveORef' oldORef@(ORef oldORefID) newORef@(ORef newORefID) = do
+moveORef' oldORef newORef@(ORef newORefID) = do
     entry <- getEntry oldORef
     ok <- liftIO $ checkEntry entry
     guard ok -- make sure old ORef is writable/doesn't have borrowers
@@ -112,7 +116,7 @@ readORef oref k = do
     return b
 
 -- | Write to an ORef or fail if it is not writable.
-writeORef :: Typeable a => ORef a -> a -> Own ()
+writeORef :: ORef a -> a -> Own ()
 writeORef oref a = do
     entry <- getEntry oref
     ok <- liftIO $ checkEntry entry
