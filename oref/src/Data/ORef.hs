@@ -88,17 +88,17 @@ moveORef oldORef = do
 --
 -- This will fail if either ORefs have borrowers
 moveORef' :: ORef a -> ORef a -> Own ()
-moveORef' oldORef newORef@(ORef newORefID) = do
-    entry <- getEntry oldORef
+moveORef' oORef nORef@(ORef newORefID) = do
+    entry <- getEntry oORef
     ok <- liftIO $ checkEntry entry
     guard ok -- make sure old ORef is writable/doesn't have borrowers
-    oldORefValue <- getValue oldORef
-    dropORef oldORef
+    oldORefValue <- getValue oORef
+    dropORef oORef
     -- now check that we can write to the oref that we are moving to.
-    newORefEntry <- getEntry newORef
+    newORefEntry <- getEntry nORef
     newORefOK <- liftIO $ checkEntry newORefEntry
     guard newORefOK -- make sure the new ORef is writable/doesn't have borrowers
-    setValue newORef oldORefValue
+    setValue nORef oldORefValue
     return ()
 
 -- | Read an ORef and use it in the given continuation.
