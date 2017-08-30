@@ -57,7 +57,7 @@ dropORef oref = do
 --
 -- A child thread should not be able to copy from its parent.
 -- As long as the threadId is the same copies of an ORef can be made.
-copyORef :: Typeable a => ORef a -> Own (ORef a)
+copyORef :: ORef a -> Own (ORef a)
 copyORef oref = do
     (new, store) <- get
     entry <- getEntry oref
@@ -73,7 +73,7 @@ copyORef oref = do
 -- Remove the old ORef.
 --
 -- This will fail if the old ORef has borrowers.
-moveORef :: Typeable a => ORef a -> Own (ORef a)
+moveORef :: ORef a -> Own (ORef a)
 moveORef oldORef = do
     entry <- getEntry oldORef
     ok <- liftIO $ checkEntry entry
@@ -116,7 +116,7 @@ readORef oref k = do
     return b
 
 -- | Write to an ORef or fail if it is not writable.
-writeORef :: ORef a -> a -> Own ()
+writeORef :: Typeable a => ORef a -> a -> Own ()
 writeORef oref a = do
     entry <- getEntry oref
     ok <- liftIO $ checkEntry entry
