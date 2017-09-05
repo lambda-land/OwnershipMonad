@@ -59,7 +59,7 @@ flag (Entry ok _ _) = ok
 setEntryFlag :: Bool -> Entry -> Entry
 setEntryFlag b (Entry _ t a) = (Entry b t a)
 
--- | This will check the flag of an entry and whether or not the thread ID of the
+-- | This will check the flag of an entry and also whether or not the thread ID of the
 -- current thread matches the thread specified in the ORef. This is to prevent a
 -- child from using ORef's that it inherited from its parent but was not
 -- explicitely given.
@@ -68,6 +68,12 @@ checkEntry (Entry ok thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && ok
 
+-- | Check ThreadId will only check whether the thread id of the ORef is the
+-- same as the one listed in the Entry for that ORef.
+--
+-- This is to check for a corner-case where a thread is forked and then
+-- the child thread wants to copy the value. In this situation we do not care about
+-- what the entry says since it's okay to copy as long as you are in the same thread.
 checkThreadId :: Entry -> IO Bool
 checkThreadId (Entry _ thrId _) = do
   threadId <- myThreadId

@@ -25,6 +25,8 @@ import Prelude hiding (lookup)
 import Data.ORef.Internal
 
 import Control.Monad.State
+import Control.Monad.Trans.Either
+
 import Data.Typeable (Typeable)
 import Data.IntMap (insert)
 import Control.Concurrent (myThreadId)
@@ -120,5 +122,6 @@ writeORef :: Typeable a => ORef a -> a -> Own ()
 writeORef oref a = do
     entry <- getEntry oref
     ok <- liftIO $ checkEntry entry
-    guard ok
-    setValue oref a
+    case ok of
+      False -> lift $ left "Error"
+      True -> setValue oref a
