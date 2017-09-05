@@ -25,7 +25,8 @@ module Data.ORef.Internal
 import Prelude hiding (lookup)
 
 import Control.Monad.State
-import Control.Monad.Trans.Maybe
+-- import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Either
 import Control.Concurrent
 
 import Data.Typeable (Typeable,cast)
@@ -38,7 +39,7 @@ data ORef a = ORef ID
 -- type Own a = StateT (ID,Store) Maybe a
 
 -- | Ownership Monad with IO in the transformers stack
-type Own a = StateT (ID,Store) (MaybeT IO) a
+type Own a = StateT (ID,Store) (EitherT String IO) a
 
 -- | Each ORef has a unique ID.
 type ID = Int
@@ -126,5 +127,5 @@ setValue oref a = do
 
 -- | Run an action in the ownership monad and return its result.
 -- evalOwn :: Own a -> Maybe a
-evalOwn :: (Num t, Monad m) => StateT (t, IntMap a) (MaybeT m) a1 -> m (Maybe a1)
-evalOwn x = runMaybeT (evalStateT x (0,empty))
+evalOwn :: (Num t, Monad m) => StateT (t, IntMap a) (EitherT String m) a1 -> m (Either String a1)
+evalOwn x = runEitherT (evalStateT x (0,empty))

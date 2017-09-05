@@ -20,6 +20,7 @@ dependencies:
   - containers
   - mtl == 2.2.1
   - transformers
+  - either
 
 library:
   source-dirs: src
