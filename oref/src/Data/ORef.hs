@@ -79,12 +79,16 @@ moveORef :: ORef a -> Own (ORef a)
 moveORef oldORef = do
     entry <- getEntry oldORef
     ok <- liftIO $ checkEntry entry
-    guard ok -- make sure old ORef is writable and doesn't have borrowers
-    new <- copyORef oldORef
-    dropORef oldORef
-    -- if we cared about memory we would want to garbage collect/delete instead
-    -- of just dropping it from the context
-    return new
+    -- make sure old ORef is writable and doesn't have borrowers
+    case ok of
+      False -> lift $ left "Error during move from an oref to a new oref \
+                           \ check entry failed for the exisiting (old) oref."
+      True -> do
+        new <- copyORef oldORef
+        dropORef oldORef
+        -- if we cared about memory we would want to garbage collect/delete instead
+        -- of just dropping it from the context
+        return new
 
 -- | Move the contents of one ORef to an existing ORef.
 --
@@ -93,15 +97,22 @@ moveORef' :: Typeable a => ORef a -> ORef a -> Own ()
 moveORef' oORef nORef = do
     entry <- getEntry oORef
     ok <- liftIO $ checkEntry entry
-    guard ok -- make sure old ORef is writable/doesn't have borrowers
-    oldORefValue <- getValue oORef
-    dropORef oORef
-    -- now check that we can write to the oref that we are moving to.
-    newORefEntry <- getEntry nORef
-    newORefOK <- liftIO $ checkEntry newORefEntry
-    guard newORefOK -- make sure the new ORef is writable/doesn't have borrowers
-    setValue nORef oldORefValue
-    return ()
+    case ok of
+      False -> lift $ left "Error during move from oref to an existing oref - \
+                           \check entry failed for old oref."
+      True -> do
+        oldORefValue <- getValue oORef
+        dropORef oORef
+        -- now check that we can write to the oref that we are moving to.
+        newORefEntry <- getEntry nORef
+        newORefOK <- liftIO $ checkEntry newORefEntry
+        -- make sure the new ORef is writable/doesn't have borrowers
+        case newORefOK of
+          False -> lift $ left "Error during move from oref to an existing oref - \
+                               \check entty failed for new oref."
+          True -> do
+            setValue nORef oldORefValue
+            return ()
 
 -- | Read an ORef and use it in the given continuation.
 --
