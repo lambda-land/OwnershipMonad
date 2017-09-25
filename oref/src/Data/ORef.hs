@@ -111,11 +111,13 @@ readORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
 readORef oref k = do
     e <- getEntry oref
     ok <- liftIO $ checkEntry e
-    guard ok
-    setFlag oref False
-    b <- k (value e)
-    setFlag oref (flag e)
-    return b
+    case ok of
+      False -> lift $ left "Error during read operation - check entry failed."
+      True -> do
+        setFlag oref False
+        b <- k (value e)
+        setFlag oref (flag e)
+        return b
 
 -- | Write to an ORef or fail if it is not writable.
 writeORef :: Typeable a => ORef a -> a -> Own ()
@@ -123,5 +125,5 @@ writeORef oref a = do
     entry <- getEntry oref
     ok <- liftIO $ checkEntry entry
     case ok of
-      False -> lift $ left "Error"
+      False -> lift $ left "Error during write operation - check entry failed."
       True -> setValue oref a
