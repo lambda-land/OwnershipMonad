@@ -14,58 +14,105 @@ singleThreadedWrite = do
   ref <- newORef ""
   -- write to it
   writeORef ref "Quark"
+
   -- create a new channel
   ch <- newOChan
   -- write the oref to the channel -- this removes the oref from the context
   writeOChan ch ref
+
   -- TODO this operation should fail resulting in Nothing when the monad is evaluated
   writeORef ref "Odo"
   -- ^^ writing to a ref that's no longer owned
 
-threadTask :: Typeable a => (Chan a) -> IO ()
-threadTask ch = do
-  ex <- (evalOwn $ do
-               _ <- readOChan ch
-               return ()
-        )
-  case ex of
-    Nothing -> do putStrLn "Error"
-    Just () -> do putStrLn "Success"
 
+-- threadTask :: Typeable a => (Chan a) -> IO ()
+-- threadTask ch = do
+--   ex <- (evalOwn $ do
+--                _ <- readOChan ch
+--                return ()
+--         )
+--   case ex of
+--     Left err -> do putStrLn ("Error" ++ err)
+--     Right _ -> do putStrLn "Success"
+
+
+-- | A simple example using ORef's and OChan's to show a set of operations that
+-- will succeed.
 chanTest :: Own ()
 chanTest = do
+  -- create a new channel
+  ch <- newOChan
   -- create an ORef in the context of this thread and ownership monad
   ref <- newORef ""
   -- write to it
   writeORef ref "Quark"
-  -- create a channel
-  ch <- newOChan
-  -- write the ref to the channel (removing it from this context)
+  -- write the oref to the channel (removing it from this context)
   writeOChan ch ref
   -- fork the thread
-  _ <- liftIO $ forkIO $ threadTask ch
+  _ <- liftIO $ forkIO $ do
+    ex <- evalOwn $ do
+      -- the child thread can read from the channel
+      _ <- readOChan ch
+      -- this places ownership of the resource in the channel within the
+      -- context of the child thread
+      return ()
+    case ex of
+      Left err -> do putStrLn ("Error" ++ err)
+      Right _ -> do putStrLn "Success"
   return ()
 
--- Why thread id is needed in Ownership context
--- doubleWriteRefChan :: Own ()
--- doubleWriteRefChan = do
---   -- create an ORef in the context of this thread and ownership monad
---   ref <- newORef ""
---   -- write to it
---   ch <- newOChan
---   writeOChan ch ref
---   -- fork the thread
---   oref <- readOChan ch
---   forkIO $ do
---     writeORef ref "Quark"
---     putStrLn "Just read an ORef from OChan"
---   writeORef oref "Odo"
+
+-- | An example of why a forked process needs to use a channel for resource
+-- access instead of accessing it through the parent thread
+forkedWriteExample :: Own ()
+forkedWriteExample = do
+  -- create an ORef in the context of this thread and Ownership context
+  ref <- newORef ""
+  -- fork the thread
+  _ <- liftIO $ forkIO $ do
+    -- child thread --
+    putStrLn "The child thread will now try to use the ORef from its parents"
+    evalResult <- evalOwn $ do
+
+      -- The child thread will now try to run some operations on the ORef from
+      -- before within the ownership monad.
+      writeORef ref "test"
+
+      -- We try to write to the ORef named ref (from the parent thread).
+      -- This ORef is visable to this block of code even though it is in
+      -- the child thread.
+      --
+      -- This will automatically result in an ownership violation and that
+      -- resource will not be able to be accessed.
+      -- TODO show an example of how this fails without ORef's
+      return ()
+    putStrLn $ "The result from the child thread was: " ++ (show evalResult)
+
+  -- delay parent thread to see child output
+  liftIO $ threadDelay 1000
+
+  -- create a channel
+  ch <- newOChan
+  -- write the oref to the channel - therefore consuming the oref
+  writeOChan ch ref
+  return ()  
 
 main :: IO ()
 main = do
-  example1 <- evalOwn singleThreadedWrite
-  putStrLn "The example should result in Nothing"
+  -- example 1 --
+  putStrLn "Running example 1"
+  example1 <- evalOwn singleThreadedWrite -- TODO example1 :: Either String ()
+  putStrLn "The example should result in an Error"
   putStrLn $ "The example resulted in " ++ show example1
+
+  -- example 2 --
+  putStrLn "Running example 2"
   example2 <- evalOwn chanTest
-  putStrLn "The example should result in Just ()"
+  -- putStrLn "The example should result in "
   putStrLn $ "The example resulted in " ++ show example2
+
+  -- example 3 --
+  putStrLn "Running example 3"
+  example3 <- evalOwn forkedWriteExample
+  putStrLn $ "The example resulted in " ++ show example3
+  

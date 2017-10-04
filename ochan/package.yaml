@@ -12,7 +12,7 @@ extra-source-files:
   - README.md
 
 dependencies:
-  - base >=4.7 && <5
+  - base >=4.8 && <5
   - oref
   - mtl == 2.2.1
   - transformers
@@ -27,11 +27,11 @@ library:
 tests:
   test:
     main: Main.hs
-    source-dirs:
-      - src
-      - test
     ghc-options:
       - -Wall
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
+    source-dirs:
+      - src
+      - test
