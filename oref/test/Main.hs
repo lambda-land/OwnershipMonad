@@ -12,7 +12,7 @@ good = do
     readORef refX (\x -> readORef refY (\y -> return (x,y)))
 
 evalGood :: IO (Either String (Int, Int))
-evalGood = evalOwn good
+evalGood = startOwn good
 
 -- | Conflicting write.
 bad :: Own (Int,Int)
@@ -23,16 +23,16 @@ bad = do
     readORef refX (\x -> readORef refY (\y -> return (x,y)))
 
 evalBad :: IO (Either String (Int, Int))
-evalBad = evalOwn bad
+evalBad = startOwn bad
 
 -- | Create an ORef and try to mutate it by adding 1 to it
 magic :: Int -> IO (Either String Int)
-magic x = evalOwn $ do
+magic x = startOwn $ do
   ref <- newORef x
   readORef ref (\a -> return (a + 1))
 
 darkMagic :: Int -> IO (Either String Int)
-darkMagic x = evalOwn $ do
+darkMagic x = startOwn $ do
   ref <- newORef x
   readORef ref (\b -> writeORef ref b)
   readORef ref (\a -> return (a + 1))

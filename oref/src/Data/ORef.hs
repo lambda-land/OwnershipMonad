@@ -10,7 +10,10 @@ module Data.ORef
     ORef
   , Own
     -- functions
+  , forkOwn
   , evalOwn
+  , startOwn
+  , execOwn
   , newORef
   , dropORef
   , copyORef

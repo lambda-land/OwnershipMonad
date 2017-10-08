@@ -19,13 +19,16 @@ module Data.ORef.Internal
   , setFlag
   , getValue
   , setValue
+  -- running the monad
+  , forkOwn
   , evalOwn
+  , startOwn
+  , execOwn
   ) where
 
 import Prelude hiding (lookup)
 
 import Control.Monad.State
--- import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Either
 import Control.Concurrent
 
@@ -131,7 +134,62 @@ setValue oref a = do
     ok <- getFlag oref
     setEntry oref ok a
 
+-- continueOwn :: MonadState s m =>
+--   StateT s (EitherT e m) a ->
+--   m (Either e a)
+-- continueOwn x = do
+--   m <- get
+--   runEitherT (evalStateT x m)
+  -- runEitherT (get >>= evalStateT x)
+
+
+-- TODO get rid of?
+-- | Evaluate the Ownership monad operations within the context of
+-- and existing Ownership monad.
+--
+-- This will use the state from the previous context.
+continueOwn :: Own a -> Own (Either String a)
+continueOwn x = do
+  s <- get
+  liftIO $ runEitherT (evalStateT x s)
+
+-- | Create a child thread that uses the state of the parent thread's ownership
+-- context when evaluating it's ownership operations in the child thread
+forkOwn :: Show a => Own a -> Own ()
+forkOwn innerOps = do
+  parentState <- get -- get the parent state before forking
+  _ <- liftIO $ forkIO $ do
+    -- within IO
+    childResult <- evalOwn innerOps parentState
+    putStrLn $ "The child result was " ++ (show childResult)
+    return ()
+  return ()
+
 -- | Run an action in the ownership monad and return its result.
--- evalOwn :: Own a -> Maybe a
-evalOwn :: (Num t, Monad m) => StateT (t, IntMap a) (EitherT String m) a1 -> m (Either String a1)
-evalOwn x = runEitherT (evalStateT x (0,empty))
+--
+-- Evaluate an ownership computation with the initial context passed as an
+-- argument.
+evalOwn :: Monad m =>
+  StateT s (EitherT String m) a1 ->
+  s ->
+  m (Either String a1)
+evalOwn actions startState =
+  runEitherT (evalStateT actions startState)
+
+-- | Run an action in the ownership monad and return its result.
+--
+-- This will run the action in an initially empty context
+startOwn :: (Num t, Monad m) =>
+  StateT (t, IntMap a) (EitherT String m) a1 ->
+  m (Either String a1)
+startOwn x = runEitherT (evalStateT x (0, empty))
+
+
+-- TODO get rid of? Not clear this is useful
+--
+-- | Evaluate a state computation with a given state and reuturn the final state,
+-- discarding the final value
+--
+-- execOwn :: Monad m => Own a -> s -> m s
+execOwn :: Monad m => StateT a1 (EitherT e m) a -> a1 -> m (Either e a1)
+execOwn x s = runEitherT (execStateT x s)

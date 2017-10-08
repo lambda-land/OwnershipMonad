@@ -2,7 +2,7 @@ module Main where
 
 import Control.Concurrent
 import Control.Monad.IO.Class (liftIO)
-
+import Control.Monad.Trans.Class (lift)
 import Data.Typeable
 
 import Control.Concurrent.OChan
@@ -50,7 +50,8 @@ chanTest = do
   writeOChan ch ref
   -- fork the thread
   _ <- liftIO $ forkIO $ do
-    ex <- evalOwn $ do
+    ex <- startOwn $ do
+      -- we use startOwn here because we an in a new ownership context
       -- the child thread can read from the channel
       _ <- readOChan ch
       -- this places ownership of the resource in the channel within the
@@ -69,24 +70,24 @@ forkedWriteExample = do
   -- create an ORef in the context of this thread and Ownership context
   ref <- newORef ""
   -- fork the thread
-  _ <- liftIO $ forkIO $ do
+  -- _ <- liftIO $ forkIO $ do
+  _ <- forkOwn $ do
     -- child thread --
-    putStrLn "The child thread will now try to use the ORef from its parents"
-    evalResult <- evalOwn $ do
-
-      -- The child thread will now try to run some operations on the ORef from
-      -- before within the ownership monad.
-      writeORef ref "test"
-
-      -- We try to write to the ORef named ref (from the parent thread).
-      -- This ORef is visable to this block of code even though it is in
-      -- the child thread.
-      --
-      -- This will automatically result in an ownership violation and that
-      -- resource will not be able to be accessed.
-      -- TODO show an example of how this fails without ORef's
-      return ()
-    putStrLn $ "The result from the child thread was: " ++ (show evalResult)
+    liftIO $ putStrLn "The child thread will now try to use the ORef from its parents"
+    -- The child thread will now try to run some operations on the ORef from
+    -- before within the ownership monad.
+    writeORef ref "test"
+    -- We try to write to the ORef named ref (from the parent thread).
+    -- This ORef is visable to this block of code even though it is in
+    -- the child thread.
+    --
+    -- This will automatically result in an ownership violation and that
+    -- resource will not be able to be accessed.
+    --
+    -- TODO show an example of how this fails without ORef's
+    liftIO $ putStrLn "The child thread will have an ownership violation before\
+                      \ getting to this operation"
+    return ()
 
   -- delay parent thread to see child output
   liftIO $ threadDelay 1000
@@ -95,24 +96,24 @@ forkedWriteExample = do
   ch <- newOChan
   -- write the oref to the channel - therefore consuming the oref
   writeOChan ch ref
-  return ()  
+  return ()
+
 
 main :: IO ()
 main = do
   -- example 1 --
   putStrLn "Running example 1"
-  example1 <- evalOwn singleThreadedWrite -- TODO example1 :: Either String ()
+  example1 <- startOwn singleThreadedWrite -- TODO example1 :: Either String ()
   putStrLn "The example should result in an Error"
   putStrLn $ "The example resulted in " ++ show example1
 
   -- example 2 --
   putStrLn "Running example 2"
-  example2 <- evalOwn chanTest
+  example2 <- startOwn chanTest
   -- putStrLn "The example should result in "
   putStrLn $ "The example resulted in " ++ show example2
 
   -- example 3 --
   putStrLn "Running example 3"
-  example3 <- evalOwn forkedWriteExample
+  example3 <- startOwn forkedWriteExample
   putStrLn $ "The example resulted in " ++ show example3
-  
