@@ -5,9 +5,7 @@ External API, types and functions
 -}
 
 module Data.ORef
-  (
-    -- types
-    ORef
+  ( ORef
   , Own
     -- functions
   , forkOwn

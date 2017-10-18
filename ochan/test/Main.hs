@@ -71,7 +71,7 @@ forkedWriteExample = do
   ref <- newORef ""
   -- fork the thread
   -- _ <- liftIO $ forkIO $ do
-  _ <- forkOwn $ do
+  forkOwn $ do
     -- child thread --
     liftIO $ putStrLn "The child thread will now try to use the ORef from its parents"
     -- The child thread will now try to run some operations on the ORef from
@@ -85,6 +85,7 @@ forkedWriteExample = do
     -- resource will not be able to be accessed.
     --
     -- TODO show an example of how this fails without ORef's
+    -- TODO add example of how forkOwn allows copies - but not moves or writes
     liftIO $ putStrLn "The child thread will have an ownership violation before\
                       \ getting to this operation"
     return ()
