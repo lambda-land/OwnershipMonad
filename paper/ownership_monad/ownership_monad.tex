@@ -22,85 +22,82 @@
 \mainmatter
 
 \chapter{Introduction}
-\section{Introduction to the Introduction}
+\section{Introduction}
 
-It is well understood that a strong aspect of functional programming
-languages is \textit{referential transparency}: effectively, an expression
-will always have the same value when it is expressed. %TODO redefine
+This paper presents a library for Haskell that implements an \textit{ownership-style}
+set of rules for resource-aware programming. This ownership system introduces a
+set of rules that govern how, when, and by whom a resource within what is called
+an Owned reference (an \textit{ORef} ) can be used. While the restrictions this
+implementation imposes may seem to increase the complexity of writing programs,
+the resulting guaranties that adhering to these rules facilitates offers
+significant improvements in specific areas. % that have historically been troublesome for Haskell.
 
-This principle would make it seem that pure in-place updates of arrays, among 
-other operations, would not be possible. 
-% Re-work this and mention low level code under the hood
-Uniqueness typing preserves referential typing by ensuring that the same
-expression never occurs more than once.
-% Elaborate on how this preserves ref trans while allowing improvements
-% under the hood
+Adding a way to keep track of resources in a pure language like Haskell may
+at the onset seem unnecessary since in a pure language, by definition, % TODO Add citation
+the data making up the resources bound to variables are immutable. Because of
+this there is inherent changing state.  Haskell's purity allows for referential
+transparency where values and variables can be thought of as being
+interchangeable in the sense that under any context evaluating an expression will
+always lead to the same result.  This is a very desirable property that
+Haskell's purity grants and it allows for a greater ability to reason about the
+behavior of a program.
 
-This paper presents a library for Haskell that implements an
-ownership-style set of rules for resource-aware programming.
-We show that while the restrictions that this implementation of
-Uniqueness Types imposes may seem to increase the complexity of
-writing programs, the resulting guaranties that
-adhering to these rules facilitates offers significant improvements in 
-specific areas. 
-% TODO List these 
-% and rework this last sentence
+Unfortunately even in a pure language like Haskell, this property breaks down in
+the context of concurrency.  Concurrency introduces a changing state as separate
+threads interleave actions.  Under some circumstances this can make a program
+in Haskell look and act as though it were an imperative language.
 
-Further, our approach shows that when Uniqueness Types are used generally
-on all variables in a program, rather than selectively, the benefits can be
-applied to the program wholistically.
-It also becomes in theory possible to reason about the memory usage over the
+Concurrent Haskell programs can still fall prey to the same fundamental
+problems that other impure languages can, namely deadlock and starvation.
+% TODO add citation for shared-state concurrency is still hard section from Real
+% World Haskell
+This paper will demonstrate what some of these problems look like using
+basic concurrency tools available in Haskell such as shared state with
+MVars and message passing with channels.
+It will then demonstrate and explain the benefits of tracking resource usage
+with a set of rules similar to affine types. The contribution that
+tracking resources while they are being used and sent between threads
+will be shown. % TODO rework this sentence
+
+% --
+\section{Additional contributions}
+
+While this library does not do so - by tracking resources with the ownership
+system it becomes in theory possible to reason about the memory usage over the
 lifetime of a program using the type system of the language. 
 % refer to:
 %https://groups.google.com/d/msg/idris-lang/NsxReBzk7LQ/0fSPgu-4EgAJ
 This method makes it possible to do a form of automatic deterministic destruction
-instead of the typical garbage collection approaches.
+instead of the typical garbage collection approaches.  This paper will show
+where in an example program this could occur.
 
-The ST monad in Haskell produces a similar outcome of making it possible to
-control memory operations.  However where the ST Monad is quite explicit
-we will show that an ownership system in an EDSL can hide this abstraction.
-The usage of Uniqueness types is then able to be done transparently without
-further code annotation on the part of the programmer and the enforcement of
-the rules can be done at compile time.
+% enforcement of the rules can be done at compile time.
 
-Approaching Uniqueness Types with this style of implementation is not a new
-concept.  Restricting all entities to following the rules specified under a
-Uniqueness discipline is applied under the Ownership System in the Rust
+\section{Background}
+
+Approaching resource usage with this style of implementation is not a new
+concept.
+Restricting all entities to following the rules specified under a affine type
+system discipline is applied under the Ownership System in the Rust
 programming language. 
-% TODO Mention improvements this offers Rust
+% TODO Explain the ownership system in Rust
+% Mention improvements this offers Rust
 
-Previous work done in Haskell for Atom has shown that a Haskell EDSL
-is entirely suitable for creating hard realtime software that requires constant
-memory use.
-% refer to: 
-% https://groups.google.com/d/msg/idris-lang/NsxReBzk7LQ/VGGOG9csEwAJ
-% and the Atom page at: 
-% https://hackage.haskell.org/package/atom
-
+% TODO rework Idris section
 Idris, which treats Uniqueness Types as a subkind of regular Types, shows
 the other way of approaching this and the benefits and tradeoffs of doing so.
 By allowing non-unique types to exist and be used along side Unique Types,
 Idris offers a degree of flexibility with it's approach to Uniqueness
-Typing that is not present with ours.  
-This allows the programmer to write most of their code in the usual way and
-only run into the restrictions that Uniqueness Typing imposes when they choose to.
-But doing so also incurs the cost that these non-unique types inherently
-carry by limiting the potential for exercising precise control over memory
-usage.
+Typing that is not present with ours. % But idris is using it for something
+% other than concurrency - TODO explain
 
-Using the type system to encode and explain what is happening with the underlying
-resources in a general way that can be independently verified and checked greatly
-increases our confidence and ability to know when a resource is finished being used.
+% TODO refer to this:
+% Using the type system to encode and explain what is happening with the underlying
+% resources in a general way that can be independently verified and checked greatly
+% increases our confidence and ability to know when a resource is finished being used.
 % refer to Edwin Brady quote at:
 % https://groups.google.com/d/msg/idris-lang/Z28F3MBBtTM/XOnUcrvsBAAJ
 
-%While it may seem at the onset to be
-%unnecessary to define a system of rules governing resource management in
-%Haskell, this specific module targets the IORef and State Monad. We will 
-%show some cases where this set of rules is necessary.
-
-%This ownership system introduces a set of rules that govern how, when, and
-%by whom a resource is available to be used.
 
 \chapter{The Ownership Monad}
 \section{Move Semantics}
@@ -113,7 +110,7 @@ ORef's section
 
 
 \bibliographystyle{plain}
-\bibliography{thesis}
+\bibliography{ownership_monad}{}
 
 % \appendix
 % \chapter{Redundancy}
