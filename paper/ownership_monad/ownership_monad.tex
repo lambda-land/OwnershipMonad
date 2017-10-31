@@ -16,6 +16,8 @@
 \usepackage{algorithm}
 \usepackage{algorithmic}
 
+\usepackage{hyperref} % For links
+
 \begin{document}
 \maketitle
 
@@ -100,7 +102,78 @@ Typing that is not present with ours. % But idris is using it for something
 
 
 \chapter{The Ownership Monad}
-\section{Move Semantics}
+
+The ownership system describes how resources can be used once they are created.
+The move semantics and ownership system this library implements are inspired by
+the Ownership system in Rust as well as Uniqueness types from Idris.
+\cite{rust_book_ownership} \cite{idris_uniqueness_types}
+% and http://docs.idris-lang.org/en/latest/reference/uniqueness-types.html
+The ownership system described by this library approximates features from the
+ownership system in Rust with some differences which account for the different
+language paradigms and use cases.
+
+\section{Move Semantics and the Ownership System}
+
+Resources are bound to a variable once they are created inside the Ownership
+Monad.  These variables are the mechanism to access - or refer - to the
+underlying resource.  In the library these are called ORef's -
+or \textit{Owned References}.
+
+\subsection{Reference Creation}
+
+An Owned Reference is created within the Ownership Monad and bound to a
+resource.
+The information inside of the resource can only be accessed by specific
+operations.  These operations will verify whether the ownership rules are being
+followed. The newly created reference \textit{owns} the resource it was given
+when it was created. A resource can only have one owner at any given time.
+This reference is the sole owner of the newly initialized resource. 
+
+\subsection{Copying a Reference}
+
+The resource that an owned reference owns may be copied by other references
+within the scope of that ownership monad.  When this occurs the new references is
+created and is then given ownership over their copy of the resource.  After a
+copy operation is performed the two references will each own what are now,
+essentially, two separate and different resources.
+
+\subsection{Moving Ownership}
+
+A resource owned by a reference can also be transferred to a new reference or
+to an existing reference. After this operation is performed it will no longer
+be possible to refer to the underlying resource through the old reference. This
+operation removes the old reference from the scope of the ownership monad it
+previously existed in and the new reference is now the sole owner of the
+resource.
+
+\subsection{Reading a Resource}
+
+A resource can be used within the confines of the ownership monad by its
+owner and a function that will return the resource to the ownership monad.
+This is similar to a borrow in Rust.  Borrows in Rust come in two flavors - we
+can either lend a resource to many borrowers if the borrowers never mutate the
+underlying resource - or we can lend it to a single borrower that will be able
+to mutate the resource.
+% TODO add borrow citation
+This library takes a slightly different approach - instead of transferring ownership
+temporarily to a new reference that will eventually return the resource to the
+original owner - a read operation in this library transfers ownership to a
+function which borrows the resource in order to use it.
+The reference that owns the resource can only lend the resource out to one
+function at a time.
+
+The reference that owns the resource will track the resource while the borrowing
+function executes. As with all resources inside owned refereces - the resource
+usage is tracked and other functions will be prevented from using the resource
+as long as it is borrowed.
+
+\subsection{Writing to a Resource}
+
+A resource can be changed by its owner as long as it does not have any borrower.
+The value within the resource can be updated and changed by the reference that
+owns the resource. This operation can be performed safely because the usage
+of the underlying resource is tracked by the ownership monad.
+
 \section{ORef's}
 ORef's section
 
