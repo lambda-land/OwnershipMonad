@@ -133,7 +133,7 @@ resource. When the operations inside that monad are complete - the references
 will no longer exist and the resources will be marked as free.
 The information inside of the resource within the \textit{Owned Reference} can
 only be accessed by the provided operations for operating on references within
-the \textit{Onwership Moand}.  These operations will verify whether the
+the \textit{Onwership Monad}.  These operations will verify whether the
 ownership rules are being followed.
 
 The newly created reference \textit{owns} the resource it was given
@@ -143,11 +143,26 @@ becomes the sole owner of that resource.
 
 \subsection{Copying a Reference}
 
-The resource that an owned reference owns may be copied by other references
+The underlying resource owned by a reference may be copied by other references
 within the scope of that ownership monad.  When this occurs the new references is
 created and is then given ownership over their copy of the resource.  After a
 copy operation is performed the two references will each own what are now,
 essentially, two separate and different resources.
+
+For those familiar with the terminology from the Rust programming language, the
+term \textit{copy} here is not the same as a copy in Rust. Rust makes a special
+distinction between making a copy of resources that are fixed in size
+\footnote{Rust will also consider an assignment operation to be a copy instead
+  of a move if the \textbf{Copy} trait or the \textbf{Clone} trait is
+  implemented for that type of resource. \cite{rust_book_traits}
+  \cite{rust_docs_clone_trait}}
+and making a copy of resources which are more complex and not fixed in size.
+For the latter case it is still possible to copy these kinds of resources but these
+need to be cloned (using the clone function) otherwise Rust will consider these
+values to have been moved. \cite{rust_book_ownership}
+With this library there is only one version of a copy and it creates a new
+resource identical to the original; there is no distinction given to the kinds
+of resources that are being copied.
 
 \subsection{Moving Ownership}
 
@@ -164,10 +179,10 @@ abstractions that will be discussed later on.
 
 There is a key difference between moving a resource from an existing reference
 and copying it to a new one.  Functionally a resource that is copied is cloned
-and duplicated - this doubles the space and creates a new resource.
-A moved resource doesn't change - instead what is altered is the record of who
-owns that resource. Neither operation, moving and copying, creates a situation
-where more than one reference owns a resource.
+and duplicated; doing this doubles the space and creates a new resource.
+A moved resource by comparison doesn't change - instead what is altered is the
+record of who owns that resource.  Neither operation, moving and copying,
+creates a situation where more than one reference owns a resource.
 
 \subsection{Reading a Resource}
 
