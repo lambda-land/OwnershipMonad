@@ -103,16 +103,23 @@ Typing that is not present with ours. % But idris is using it for something
 
 \chapter{The Ownership Monad}
 
-The ownership system describes how resources can be used once they are created.
-The move semantics and ownership system this library implements are inspired by
-the Ownership system in Rust as well as Uniqueness types from Idris.
-\cite{rust_book_ownership} \cite{idris_uniqueness_types}
-% and http://docs.idris-lang.org/en/latest/reference/uniqueness-types.html
-The ownership system described by this library approximates features from the
-ownership system in Rust with some differences which account for the different
-language paradigms and use cases.
+The term \textit{Ownership System} is used to describe the system for how
+resources are tracked and how they can be used once they are created.
+The \textit{Move semantics} describe the outcome from using the operations provided
+for the \textit{Ownership System}.
 
-\section{Move Semantics and the Ownership System}
+The \textit{Ownership System} and \textit{Move semantics} this library
+implements are inspired by the Ownership system in Rust as well as
+Uniqueness types from Idris. \cite{rust_book_ownership} \cite{idris_uniqueness_types}
+The \textit{Ownership System} described by this paper and implemented by the
+accompanying library approximates some of the features from the Rust language
+Differences result between the two from the different language paradigms and
+the different use cases. Uniqueness types in Idris, ownership in Rust, and
+the \textit{Ownership Monad} all use some form of the idea that by tracking
+resource use and applying rules to how resources are used - certain properties
+can be enforced.
+
+\section{The Ownership System}
 
 Resources are bound to a variable once they are created inside the Ownership
 Monad.  These variables are the mechanism to access - or refer - to the
@@ -121,13 +128,18 @@ or \textit{Owned References}.
 
 \subsection{Reference Creation}
 
-An Owned Reference is created within the Ownership Monad and bound to a
-resource.
-The information inside of the resource can only be accessed by specific
-operations.  These operations will verify whether the ownership rules are being
-followed. The newly created reference \textit{owns} the resource it was given
-when it was created. A resource can only have one owner at any given time.
-This reference is the sole owner of the newly initialized resource. 
+An \textit{Owned Reference} is created within the Ownership Monad and bound to a
+resource. When the operations inside that monad are complete - the references
+will no longer exist and the resources will be marked as free.
+The information inside of the resource within the \textit{Owned Reference} can
+only be accessed by the provided operations for operating on references within
+the \textit{Onwership Moand}.  These operations will verify whether the
+ownership rules are being followed.
+
+The newly created reference \textit{owns} the resource it was given
+when it was created. Resources that are put into references can only have one
+owner at any given time. This reference bound to the newly initialized resource
+becomes the sole owner of that resource.
 
 \subsection{Copying a Reference}
 
@@ -146,6 +158,17 @@ operation removes the old reference from the scope of the ownership monad it
 previously existed in and the new reference is now the sole owner of the
 resource.
 
+Move operations provide a way for a references to interact with
+other references and provide a building block for larger more complex
+abstractions that will be discussed later on.
+
+There is a key difference between moving a resource from an existing reference
+and copying it to a new one.  Functionally a resource that is copied is cloned
+and duplicated - this doubles the space and creates a new resource.
+A moved resource doesn't change - instead what is altered is the record of who
+owns that resource. Neither operation, moving and copying, creates a situation
+where more than one reference owns a resource.
+
 \subsection{Reading a Resource}
 
 A resource can be used within the confines of the ownership monad by its
@@ -163,7 +186,7 @@ The reference that owns the resource can only lend the resource out to one
 function at a time.
 
 The reference that owns the resource will track the resource while the borrowing
-function executes. As with all resources inside owned refereces - the resource
+function executes. As with all resources inside owned reference - the resource
 usage is tracked and other functions will be prevented from using the resource
 as long as it is borrowed.
 
@@ -173,6 +196,13 @@ A resource can be changed by its owner as long as it does not have any borrower.
 The value within the resource can be updated and changed by the reference that
 owns the resource. This operation can be performed safely because the usage
 of the underlying resource is tracked by the ownership monad.
+
+\section{Move Semantics}
+
+\subsection{Behavior}
+
+With the Ownership system enforcing the rules dictating how a resource can be
+used
 
 \section{ORef's}
 ORef's section
