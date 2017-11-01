@@ -188,22 +188,39 @@ creates a situation where more than one reference owns a resource.
 
 A resource can be used within the confines of the ownership monad by its
 owner and a function that will return the resource to the ownership monad.
-This is similar to a borrow in Rust.  Borrows in Rust come in two flavors - we
-can either lend a resource to many borrowers if the borrowers never mutate the
-underlying resource - or we can lend it to a single borrower that will be able
-to mutate the resource.
-% TODO add borrow citation
-This library takes a slightly different approach - instead of transferring ownership
-temporarily to a new reference that will eventually return the resource to the
-original owner - a read operation in this library transfers ownership to a
-function which borrows the resource in order to use it.
-The reference that owns the resource can only lend the resource out to one
-function at a time.
+This is similar to passing a borrowed value in Rust to a function.
 
-The reference that owns the resource will track the resource while the borrowing
-function executes. As with all resources inside owned reference - the resource
-usage is tracked and other functions will be prevented from using the resource
-as long as it is borrowed.
+A function in Rust will either copy the value it is passed, take
+ownership of the value, or it will borrow the value in which case ownership of
+the value will is automatically returned when the function has finished
+execution.\cite{rust_book_ownership} A function in Rust that takes a borrowed
+value as an argument is - in a way - syntactic sugar over that function taking
+ownership of the value and returning it at part of the return value. Instead
+of having to do this explicitly a value can be borrowed by having the function
+take a reference to that the value and then the ownership is handed back by
+the Rust compiler which will track the borrows (with the borrow checker).
+% TODO I know this is how it works - but I should cite this to be sure.
+Borrows in Rust come in two flavors - we can either lend a resource to many
+borrowers if the borrowers never mutate the underlying resource - or we can
+lend it to a single borrower that will be able to mutate the
+resource.\cite{rust_book_borrowing}
+It should be clear why giving multiple variables mutable access to
+the same resource could create data races - which is why mutable borrows to
+multiple variables (or functions) is not allowed.
+
+This library takes a slightly different approach: a read operation
+lends the resource to a function which temporarily borrows the resource
+in order to use it.  The reference that owns the resource can only lend the
+resource out to one function at a time and the function remains inside of the
+context of the Ownership monad. Much like Rust will not lend out a mutable resource
+to multiple borrowers - neither will the read operation on a ORef. The key to
+allowing multiple (potential mutable) operations to occur on a resource is
+to make sure that they will not occur simultaneously. Because each read
+operation occurs within the context of the ownership monad the resource usage
+can be tracked and this property can be ensured.
+The reference that owns the resource will track the resource while the 
+function executes and other functions or owned references will be prevented from
+using the resource as long as long as it is borrowed. 
 
 \subsection{Writing to a Resource}
 
