@@ -119,17 +119,43 @@ moveORef' oORef nORef = do
 --
 -- This is - in effect - a borrow. A temporary use of
 -- something before we hand it back to the original owner.
+--
+-- The function is of type (a -> Own b) and it will operate by using the value
+-- and not the ORef itself.  This means that the function that is being used in
+-- the read operation will not be able to write to the original ORef.
+-- Even if the @writeORef@ function is partially applied on the original
+-- ORef and then passed as the function given to the @readORef@ - it will not be
+-- able to write to the original ORef during the read operation.
 readORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
 readORef oref k = do
     e <- getEntry oref
     ok <- liftIO $ checkEntry e
+    -- TODO do we need the check here?
+    -- This should use a different check.
+    -- This is checking if the ORef can be written to
+    -- and for a readORef operation we only care about if it can be read
+    -- Changing this check would allow for multiple operations to perform
+    -- read operations on an ORef at the same time (multiple immutable borrows.)
     case ok of
       False -> lift $ left "Error during read operation - check entry failed."
       True -> do
         setFlag oref False
-        b <- k (value e)
-        setFlag oref (flag e)
-        return b
+        -- set the oref to false (meaning it cannot be written to) since it is being borrowed
+        b <- k (value e) -- use the value in the oref
+        -- setFlag oref (flag e)
+        -- this would always set it back to false right? TODO test this
+        setFlag oref True
+        -- set the oref to true since it is not longer being borrowed (and can be written to)
+        return b -- return the result of using the function on ORef a
+
+-- TODO add tests for readORef to show that after the read operation is complete
+-- the ORef is marked as not having any borrowers (marked as True)
+-- and that during the read operation is the ORef is marked as having borrowers
+-- (marked as False)
+-- TODO add test to show that a partially applied writeORef passed as the function
+-- to a readORef will not be able to mutate the original ORef.
+-- TODO add example of multiple operations performing read operations on an ORef
+
 
 -- | Write to an ORef or fail if it is not writable.
 writeORef :: Typeable a => ORef a -> a -> Own ()
