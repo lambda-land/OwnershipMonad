@@ -152,15 +152,6 @@ borrowORef oref k = do
         -- set the oref write to true since it is not longer being borrowed (and can be written to)
         return b  -- return the result of using the function on ORef a
 
--- TODO add tests for readORef to show that after the read operation is complete
--- the ORef is marked as not having any borrowers (marked as True)
--- and that during the read operation is the ORef is marked as having borrowers
--- (marked as False)
--- TODO add test to show that a partially applied writeORef passed as the function
--- to a readORef will not be able to mutate the original ORef.
--- TODO add example of multiple operations performing read operations on an ORef
-
-
 -- | Borrow an ORef in a mutable way.
 --
 -- If a function can be read and written to then it can be borrowed by a single

@@ -45,9 +45,6 @@ import Data.IntMap (IntMap, empty, lookup, insert, adjust)
 -- | A typed reference to an owned value.
 data ORef a = ORef ID
 
--- | Ownership monad.
--- type Own a = StateT (ID,Store) Maybe a
-
 -- | Ownership Monad with IO in the transformers stack
 type Own a = StateT (ID,Store) (EitherT String IO) a
 
@@ -236,7 +233,7 @@ startOwn x = runEitherT (evalStateT x (0, empty))
 
 -- TODO get rid of? Not clear this is useful
 --
--- | Evaluate a state computation with a given state and reuturn the final state,
+-- | Evaluate a state computation with a given state and return the final state,
 -- discarding the final value
 --
 -- execOwn :: Monad m => Own a -> s -> m s
