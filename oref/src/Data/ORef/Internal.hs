@@ -8,6 +8,9 @@ module Data.ORef.Internal
   ( ORef(ORef)
   , Own
   , Entry(..)
+  , incBC
+  , decBC
+  , hasBorrowers
   -- , readFlag
   -- , writeFlag
   -- , setEntryReadFlag
@@ -75,13 +78,19 @@ borrowerCount (Entry _r _w bc _thID _v) = bc
 setEntryBorrowerCount :: Int -> Entry -> Entry
 setEntryBorrowerCount bc (Entry r w _ thID v) = (Entry r w bc thID v)
 
--- | Increase the borrower count by a certain number 
+-- | Increase the borrower count by a certain number
 addToBorrowerCount :: Int -> Entry -> Entry
 addToBorrowerCount newB (Entry r w bc thID v) = (Entry r w (bc + newB) thID v)
 
--- | Decrease the borrower count by a certain number 
+-- | Decrease the borrower count by a certain number
 reduceBorrowerCount :: Int -> Entry -> Entry
 reduceBorrowerCount lessB (Entry r w bc thID v) = (Entry r w (bc + lessB) thID v)
+
+incBC :: ORef a -> Own ()
+incBC oref = adjustEntry oref (addToBorrowerCount 1)
+
+decBC :: ORef a -> Own ()
+decBC oref = adjustEntry oref (reduceBorrowerCount 1)
 
 hasBorrowers :: ORef a -> Own Bool
 hasBorrowers oref = do
@@ -117,24 +126,24 @@ checkEntryWriteFlagThread (Entry _r w bc thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && w
 
--- TODO check borrowers?
 -- | Check if the entry is able to be read and written to.
 --
 -- This will also check if the thread ID of the current thread matches the
--- thread specified in the ORef.
+-- thread specified in the Entry.
+-- and if the Entry has more than 0 borrowers.
 --
 -- Checking the thread is done to prevent a child from using ORef's that it
 -- inherited from its parent but was not explicitely given.
 checkEntry :: Entry -> IO Bool
 checkEntry (Entry r w bc thrId _) = do
   threadId <- myThreadId
-  return $ (threadId == thrId) && r && w
+  return $ (threadId == thrId) && r && w && (bc <= 0)
 
--- TODO check borrowers?
 -- | Check if the ORef is able to be read and written to.
 --
 -- This will also check if the thread ID of the current thread matches the
 -- thread specified in the ORef.
+-- and if the ORef has more than 0 borrowers.
 --
 -- Checking the thread is done to prevent a child from using ORef's that it
 -- inherited from its parent but was not explicitely given.
@@ -143,7 +152,6 @@ checkORef oref  = do
   entry <- getEntry oref
   ok <- liftIO $ checkEntry entry
   return ok
-
 
 -- | The value of an entry casted to the expected type.
 value :: Typeable a => Entry -> a
