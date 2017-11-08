@@ -3,7 +3,6 @@ Module: Data.ORef
 
 External API, types and functions
 -}
-
 module Data.ORef
   ( ORef
   , Own
@@ -17,7 +16,8 @@ module Data.ORef
   , copyORef
   , moveORef
   , moveORef'
-  , readORef
+  , borrowORef
+  , mutableBorrowORef
   , writeORef
   ) where
 
@@ -114,28 +114,29 @@ moveORef' oORef nORef = do
             setValue nORef oldORefValue
             return ()
 
--- | Read an ORef and use it in the given continuation.
+-- | Borrow an ORef and use it in the given continuation.
 --
--- This is - in effect - a borrow. A temporary use of
--- something before we hand it back to the original owner.
+-- A borrow is the temporary and immutable use of the value within an ORef
+-- before we hand it back to the original owner.
 --
--- For a readORef operation we only care about if the ORef can be read.
+-- For a borrowORef operation we only care about if the ORef can be read.
+--
 -- We will not be mutating the ORef that is being read. For that reason a
--- readORef operation can have multiple functions at the same time for the same
+-- borrowORef operation can have multiple functions at the same time for the same
 -- ORef. This is similiar to having multiple immutable borrowers.
 --
 -- The function is of type (a -> Own b) and it will operate by using the value
 -- inside the ORef but not the ORef itself.
 --
--- This means that the function that is being used in the read operation will
+-- This means that the function that is being used in the borrow operation will
 -- __not__ be able to write to the original ORef.
 --
 -- Even if the @writeORef@ function is partially applied on the original
--- ORef and then passed as the function given to the @readORef@ - it will not be
--- able to write to the original ORef during the read operation.
+-- ORef and then passed as the function given to the @borrowORef@ - it will not be
+-- able to write to the original ORef during the borrow operation.
 --
-readORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
-readORef oref k = do
+borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
+borrowORef oref k = do
     e <- getEntry oref
     ok <- liftIO $ checkEntryReadFlagThread e
     -- This will check if we can read the entry and if it is in our thread
@@ -159,6 +160,31 @@ readORef oref k = do
 -- to a readORef will not be able to mutate the original ORef.
 -- TODO add example of multiple operations performing read operations on an ORef
 
+
+-- | Borrow an ORef in a mutable way.
+--
+-- If a function can be read and written to then it can be borrowed by a single
+-- function. This function will apply the function. and the value of the ORef
+-- will be updated.
+--
+-- This allows one function to have the ability to operate on the value
+-- inside an ORef and mutate it.
+mutableBorrowORef :: Typeable a => ORef a -> (a -> Own a) -> Own ()
+mutableBorrowORef oref k = do
+    ok <- checkORef oref -- check if the ORef can be read and written to
+    case ok of
+      False -> lift $ left "Error during mutable operation - checking if the \
+                           \ entry was in in the same thread or if it could be \
+                           \ read and written to returned false."
+      True -> do
+        setWriteFlag oref False
+        setReadFlag oref False
+        v <- getValue oref
+        b <- k v -- use the value in the oref
+        setValue oref b -- update the ORef
+        setWriteFlag oref True
+        setReadFlag oref True
+        return ()
 
 -- | Write to an ORef or fail if it is not writable.
 writeORef :: Typeable a => ORef a -> a -> Own ()
