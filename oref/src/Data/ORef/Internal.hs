@@ -56,41 +56,68 @@ type Store = IntMap Entry
 
 type Readable = Bool
 type Writeable = Bool
+type BorrowerCount = Int
 
 -- | An entry in the store is
 -- a boolean flag indicating whether this ORef can be read,
 -- a boolean flag indicating whether this ORef can be written to,
+-- the number of borrowers
 -- the threadID of the owner,
 -- and a value of arbitrary type.
-data Entry = forall v. Typeable v => Entry Readable Writeable ThreadId v
+data Entry = forall v. Typeable v => Entry Readable Writeable BorrowerCount ThreadId v
+
+
+-- | Get the borrower count for an Entry
+borrowerCount :: Entry -> Int
+borrowerCount (Entry _r _w bc _thID _v) = bc
+
+-- | Set the borrrower count for an Entry
+setEntryBorrowerCount :: Int -> Entry -> Entry
+setEntryBorrowerCount bc (Entry r w _ thID v) = (Entry r w bc thID v)
+
+-- | Increase the borrower count by a certain number 
+addToBorrowerCount :: Int -> Entry -> Entry
+addToBorrowerCount newB (Entry r w bc thID v) = (Entry r w (bc + newB) thID v)
+
+-- | Decrease the borrower count by a certain number 
+reduceBorrowerCount :: Int -> Entry -> Entry
+reduceBorrowerCount lessB (Entry r w bc thID v) = (Entry r w (bc + lessB) thID v)
+
+hasBorrowers :: ORef a -> Own Bool
+hasBorrowers oref = do
+  bc <- getBorrowerCount oref
+  return (bc > 0)
 
 -- | The flag of an entry.
 readFlag :: Entry -> Bool
-readFlag (Entry r _w _ _) = r
+readFlag (Entry r _w _ _ _) = r
 
 writeFlag :: Entry -> Bool
-writeFlag (Entry _r w _ _) = w
+writeFlag (Entry _r w _ _ _) = w
 
 -- | Adjust the flag of an Entry to the given flag
 setEntryReadFlag :: Bool -> Entry -> Entry
-setEntryReadFlag b (Entry _ w t a) = (Entry b w t a)
+setEntryReadFlag b (Entry _ w bc t a) = (Entry b w bc t a)
 
 -- | Adjust the flag of an Entry to the given flag
 setEntryWriteFlag :: Bool -> Entry -> Entry
-setEntryWriteFlag b (Entry r _ t a) = (Entry r b t a)
+setEntryWriteFlag b (Entry r _ bc t a) = (Entry r b bc t a)
 
+-- TODO check borrowers?
 -- | Check if an Entry can be read and if it is in the same thread
 checkEntryReadFlagThread :: Entry -> IO Bool
-checkEntryReadFlagThread (Entry r _w thrId _) = do
+checkEntryReadFlagThread (Entry r _w bc thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && r
 
+-- TODO check borrowers?
 -- | Check if an Entry can be written to and if it is in the same thread
 checkEntryWriteFlagThread :: Entry -> IO Bool
-checkEntryWriteFlagThread (Entry _r w thrId _) = do
+checkEntryWriteFlagThread (Entry _r w bc thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && w
 
+-- TODO check borrowers?
 -- | Check if the entry is able to be read and written to.
 --
 -- This will also check if the thread ID of the current thread matches the
@@ -99,10 +126,11 @@ checkEntryWriteFlagThread (Entry _r w thrId _) = do
 -- Checking the thread is done to prevent a child from using ORef's that it
 -- inherited from its parent but was not explicitely given.
 checkEntry :: Entry -> IO Bool
-checkEntry (Entry r w thrId _) = do
+checkEntry (Entry r w bc thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && r && w
 
+-- TODO check borrowers?
 -- | Check if the ORef is able to be read and written to.
 --
 -- This will also check if the thread ID of the current thread matches the
@@ -117,21 +145,9 @@ checkORef oref  = do
   return ok
 
 
--- | Check ThreadId will only check whether the thread id of the ORef is the
--- same as the one listed in the Entry for that ORef.
---
--- This is to check for a corner-case where a thread is forked and then
--- the child thread wants to copy the value. In this situation we do not care about
--- what the entry says since it's okay to copy as long as you are in the same thread.
--- checkThreadId :: Entry -> IO Bool
--- checkThreadId (Entry _ thrId _) = do
---   threadId <- myThreadId
---   return $ (threadId == thrId)
-
-
 -- | The value of an entry casted to the expected type.
 value :: Typeable a => Entry -> a
-value (Entry _ _ _ v) = case cast v of
+value (Entry _ _ _ _ v) = case cast v of
     Just a  -> a
     Nothing -> error "internal cast error"
 
@@ -145,10 +161,10 @@ getEntry (ORef i) = get >>= maybe err return . lookup i . snd
   where err = error ("entry not found: " ++ show i)
 
 -- | Set an entry in the store.
-setEntry :: Typeable a => ORef a -> Bool -> Bool -> a -> Own ()
-setEntry (ORef i) r w a = do
+setEntry :: Typeable a => ORef a -> Bool -> Bool -> Int -> a -> Own ()
+setEntry (ORef i) r w bc a = do
   thrId <- liftIO $ myThreadId
-  modifyStore (insert i (Entry r w thrId a))
+  modifyStore (insert i (Entry r w bc thrId a))
 
 -- | Adjust an entry in current store
 --
@@ -167,6 +183,10 @@ getReadFlag oref = fmap readFlag (getEntry oref)
 -- | Get the current flag for writing to an ORef.
 getWriteFlag :: ORef a -> Own Bool
 getWriteFlag oref = fmap writeFlag (getEntry oref)
+
+-- | Get the current flag for writing to an ORef.
+getBorrowerCount :: ORef a -> Own Int
+getBorrowerCount oref = fmap borrowerCount (getEntry oref)
 
 -- | Set the read flag for an ORef.
 setReadFlag :: ORef a -> Bool -> Own ()
@@ -187,7 +207,8 @@ setValue :: Typeable a => ORef a -> a -> Own ()
 setValue oref a = do
     r <- getReadFlag oref
     w <- getWriteFlag oref
-    setEntry oref r w a
+    bc <- getBorrowerCount oref
+    setEntry oref r w bc a
 
 
 -- TODO get rid of continueOwn?

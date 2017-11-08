@@ -39,7 +39,8 @@ newORef :: Typeable a => a -> Own (ORef a)
 newORef a = do
     (new,store) <- get
     thrId <- liftIO $ myThreadId
-    put (new + 1, insert new (Entry True True thrId a) store)
+    let entry = (Entry True True 0 thrId a)
+    put (new + 1, insert new entry store)
     return (ORef new)
 
 -- | Remove an ORef from the current context
