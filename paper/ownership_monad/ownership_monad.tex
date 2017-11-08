@@ -105,19 +105,21 @@ Typing that is not present with ours. % But idris is using it for something
 
 The term \textit{Ownership System} is used to describe the system for how
 resources are tracked and how they can be used once they are created.
-The \textit{Move semantics} describe the outcome from using the operations provided
+\textit{Move Semantics} describe the outcome from using the operations provided
 for the \textit{Ownership System}.
 
-The \textit{Ownership System} and \textit{Move semantics} this library
+The \textit{Ownership System} and \textit{Move Semantics} this library
 implements are inspired by the Ownership system in Rust as well as
-Uniqueness types from Idris. \cite{rust_book_ownership} \cite{idris_uniqueness_types}
-The \textit{Ownership System} described by this paper and implemented by the
-accompanying library approximates some of the features from the Rust language
-Differences result between the two from the different language paradigms and
-the different use cases. Uniqueness types in Idris, ownership in Rust, and
-the \textit{Ownership Monad} all use some form of the idea that by tracking
-resource use and applying rules to how resources are used - certain properties
-can be enforced.
+Uniqueness types from Idris.\cite{rust_book_ownership} \cite{idris_uniqueness_types}
+The \textit{Ownership System} described by this paper approximates some of the
+features from the Rust language but differences between the two result from the
+different language paradigms and the different use cases.
+
+Uniqueness types in Idris, ownership in Rust, and the \textit{Ownership Monad}
+make use of the idea that by tracking resource use and applying rules to how
+resources are used - certain properties can be enforced.
+
+% TODO briefly what these are here
 
 \section{The Ownership System}
 
