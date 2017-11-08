@@ -11,16 +11,17 @@ module Data.ORef.Internal
   -- , readFlag
   -- , writeFlag
   -- , setEntryReadFlag
-  -- , setEntryWriteFlag
-  , checkEntryReadFlag
-  , checkEntryWriteFlag
+  , setEntryWriteFlag
+  , checkEntryReadFlagThread
+  , checkEntryWriteFlagThread
   -- , checkEntry
+  , checkORef
   -- , checkThreadId
   , value
   , getEntry
   -- , deleteEntry
-  , getReadFlag
-  , getWriteFlag
+  -- , getReadFlag
+  -- , getWriteFlag
   , setReadFlag
   , setWriteFlag
   , getValue
@@ -81,27 +82,42 @@ setEntryReadFlag b (Entry _ w t a) = (Entry b w t a)
 setEntryWriteFlag :: Bool -> Entry -> Entry
 setEntryWriteFlag b (Entry r _ t a) = (Entry r b t a)
 
--- | Check if an Entry can be read.
-checkEntryReadFlag :: Entry -> IO Bool
-checkEntryReadFlag (Entry r _w thrId _) = do
+-- | Check if an Entry can be read and if it is in the same thread
+checkEntryReadFlagThread :: Entry -> IO Bool
+checkEntryReadFlagThread (Entry r _w thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && r
 
--- | Check if an Entry can be written to.
-checkEntryWriteFlag :: Entry -> IO Bool
-checkEntryWriteFlag (Entry _r w thrId _) = do
+-- | Check if an Entry can be written to and if it is in the same thread
+checkEntryWriteFlagThread :: Entry -> IO Bool
+checkEntryWriteFlagThread (Entry _r w thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && w
 
 -- | Check if the entry is able to be read and written to.
+--
 -- This will also check if the thread ID of the current thread matches the
 -- thread specified in the ORef.
--- Check the thread is done to prevent a child from using ORef's that it
+--
+-- Checking the thread is done to prevent a child from using ORef's that it
 -- inherited from its parent but was not explicitely given.
 checkEntry :: Entry -> IO Bool
 checkEntry (Entry r w thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && r && w
+
+-- | Check if the ORef is able to be read and written to.
+--
+-- This will also check if the thread ID of the current thread matches the
+-- thread specified in the ORef.
+--
+-- Checking the thread is done to prevent a child from using ORef's that it
+-- inherited from its parent but was not explicitely given.
+checkORef :: ORef a -> Own Bool
+checkORef oref  = do
+  entry <- getEntry oref
+  ok <- liftIO $ checkEntry entry
+  return ok
 
 
 -- | Check ThreadId will only check whether the thread id of the ORef is the
