@@ -184,64 +184,94 @@ A moved resource by comparison doesn't change - instead what is altered is the
 record of who owns that resource.  Neither operation, moving and copying,
 creates a situation where more than one reference owns a resource.
 
-\subsection{Reading a Resource}
+\subsection{Immutably Borrowing a Resource}
 
-\textit{Reading} a resource is the operation that allows a function to have
+\textit{Borrowing} a resource is the operation that allows a function to have
 access to be able to use the contents of an owned reference.
-This is to say that a resource can be used within the confines of the ownership
-monad by its owner and a function that will be required to return the resource
-to the context of the ownership monad.
+A resource can be used within the confines of the ownership monad by its owner
+and a function that will be required to return the resource to the context of
+the ownership monad.
 
-This operation is similar to in the Rust language of passing an immutable value to
-a function as an immutable borrow. % TODO rework
-To give some background on this: depending on the type signature, a function in
-Rust will either copy the value it is passed, take ownership of the value, or it
-will borrow the value - in which case ownership of the value is automatically
-returned when the function has finished execution.\cite{rust_book_ownership}
+This operation is similar to passing a value to a function as an immutable
+borrow in the Rust language.  To give some background on what this means:
+depending on the type signature a function in Rust will either copy the value
+it is passed, take ownership of the value, or it will borrow the value - in
+which case ownership of the value is automatically returned when the function
+has finished execution.\cite{rust_book_ownership}
 A function in Rust that takes a borrowed value as an argument is - in a way -
 syntactic sugar over that function first taking ownership of the value and then
-returning ownership over it as part of the return value.
+returning ownership over the value by placing it within the expression that is
+returned.
 Instead of having to do these steps explicitly - a value can be passed to a
 function as a borrowed value.  When a value is borrowed, the function will take
 a reference to that the value from the original owner and eventually the
 ownership of the resource will be handed back when the function returns.
 The Rust compiler which will track the borrows (with the borrow checker).
-% TODO I know this is how it works - but I should cite this to be sure.
+% TODO add citation
 
 Borrows in Rust come in two flavors - we can either lend a resource to many
-borrowers if the borrowers never mutate the underlying resource - or we can
-lend it to a single borrower that will be able to mutate the
+borrowers as long as the borrowers never mutate the underlying resource - or we
+can lend it to a single borrower that will be able to mutate the
 resource.\cite{rust_book_borrowing}
 It should be clear why giving multiple variables mutable access to
 the same resource could create data races - which is why mutable borrows to
 multiple variables (or functions) are not allowed.
 
-This library takes a slightly different approach: a read operation
-lends the resource to a function which temporarily borrows the resource
-in order to use it. While the resource is being borrowed it is prevented
-from being written to. The function remains inside of the context of the
-Ownership monad.
+This library takes a slightly different approach: instead of letting variables
+borrow a resource, a borrow operation instead lends the resource to a function
+which temporarily borrows the resource in order to use it.  While the resource
+is being borrowed it is prevented from being written to. The function remains
+inside of the context of the Ownership Monad while it executes.
 
 Much like the Rust language will not allow for a mutable resource to be lent to
-multiple borrowers - neither will the read operation on a ORef.
+multiple borrowers - neither will the borrow operation on a ORef.
 The ORef will ensure that the resource is not mutated or written to while is it
 lent out to the borrowing function. 
-Because each read operation occurs within the context of the ownership monad the
-resource usage can be tracked and this property can be ensured.
-The reference that owns the resource will track the resource while the 
-function executes.
+Because each borrow operation occurs within the context of the Ownership Monad
+the resource usage can be tracked and this property can be ensured. The
+reference that owns the resource will track the resource while the function
+executes.
 
-This library does allow multiple functions to simultaneously perform
-\textit{read} operations on an existing ORef.
-This is equivalent to a variable being borrowed by more than one immutable
-borrowers in Rust.  In this library the read operation can only read the value
-and will not allow the resource to be mutated.
-
-The read operation also ensures that the original ORef is not able to go away
+The borrow operation also ensures that the original ORef is not able to go away
 before the function borrowing it is complete - this will make sure that the
 function is not referring to an ORef that no longer exists.  The ORef that is
 being borrowed by the function is not able to be moved (or otherwise dropped)
-before the function that the resource has been lent to is complete.
+before the function that the resource has been lent to is complete. This is
+enforced by the \textit{move} and \textit{drop} which individually check that
+a ORef does not have any borrowers before they operate on the ORef.
+
+This library also allows multiple functions to simultaneously perform
+\textit{borrow} operations on an existing ORef. This is equivalent to a variable
+being borrowed by more than one immutable borrower in Rust. To do this a
+borrower count is maintained by each ORef and the \textit{writable} flag is not
+reset until this count is zero.
+
+In this library the borrow operation can only read the value and will not allow
+the resource to be mutated by the function.  In order to be able to borrow and
+mutate the reference a different operation is required.
+
+\subsection{Mutably Borrowing a Resource}
+
+This library also allows a function borrowing a resource to be able to
+write to (or mutate) the resource in the original ORef.  In Rust this would be
+equivalent to having a single mutable borrower.  The \textit{mutable borrow}
+operation in this library permits the function borrowing that resource to read
+and set the value in the original ORef.
+
+To allow a mutable borrow it is necessary to know if other functions are
+borrowing the resource.  Each ORef tracks if it has borrowers by keeping a
+ledger indicating if it is able to be read from or written to and how many
+living borrowers it has.  When a resource has one or more immutable borrowers it
+is no longer able to be written to - but it can still be read from.
+The reason why ORef's have two flags - one for read and one for write - is that
+if a resource can be both read from and written to then we know it doesn't have
+any borrowers; if it cannot be read from or written to we know it was either
+dropped or it currently already has a mutable borrower.
+In order to allow one borrower to be able to mutate the resource it is required
+that it is the only borrower of the resource at that time. % TODO rework
+A mutable borrow is prevented from happening is the ORef is not writable.
+
+% TODO Mention the Idris approach of borrows
 
 \subsection{Writing to a Resource}
 
@@ -252,26 +282,6 @@ of the underlying resource is tracked by the ownership monad.
 
 % The key to allowing multiple (potential mutable) operations to occur on a
 % resource is to make sure that they will not occur simultaneously.
-
-
-\subsection{Differences from Rust}
-
-% Writing to a Borrowed Resource.
-This library does not allow a function borrowing a resource to be able to
-write to or mutate the resource in the original ORef.  In Rust this would be
-equivalent to having a single mutable borrower. The read operation in this
-library only permits the function borrowing that resource to read from the
-original ORef and not write to it.
-% TODO Mention the Idris approach of borrows
-
-% If this were to be allowed we would need to know
-% whether or not any other variables were borrowing the resource
-% since we do allow for multiple immutable reads/borrows.
-%
-% In order to allow one borrower to be able to mutate with resource we would
-% need to be able to say that it was the only borrower. At the moment we
-% do not track how many borrowers a resource has - only that during a read
-% operation that is has one or more.
 
 
 \section{Move Semantics}
