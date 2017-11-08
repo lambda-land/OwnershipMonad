@@ -8,15 +8,21 @@ module Data.ORef.Internal
   ( ORef(ORef)
   , Own
   , Entry(..)
-  , flag
-  , setEntryFlag
-  , checkEntry
-  , checkThreadId
+  -- , readFlag
+  -- , writeFlag
+  -- , setEntryReadFlag
+  -- , setEntryWriteFlag
+  , checkEntryReadFlag
+  , checkEntryWriteFlag
+  -- , checkEntry
+  -- , checkThreadId
   , value
   , getEntry
   -- , deleteEntry
-  , getFlag
-  , setFlag
+  , getReadFlag
+  , getWriteFlag
+  , setReadFlag
+  , setWriteFlag
   , getValue
   , setValue
   -- running the monad
@@ -33,7 +39,7 @@ import Control.Monad.Trans.Either
 import Control.Concurrent
 
 import Data.Typeable (Typeable,cast)
-import Data.IntMap (IntMap, empty, lookup, insert, delete, adjust)
+import Data.IntMap (IntMap, empty, lookup, insert, adjust)
 
 -- | A typed reference to an owned value.
 data ORef a = ORef ID
@@ -50,26 +56,53 @@ type ID = Int
 -- | Store that maps IDs to entries.
 type Store = IntMap Entry
 
--- | An entry in the store is a boolean flag indicating whether this ORef can
---   be written to and a value of arbitrary type.
-data Entry = forall v. Typeable v => Entry Bool ThreadId v
+type Readable = Bool
+type Writeable = Bool
+
+-- | An entry in the store is
+-- a boolean flag indicating whether this ORef can be read,
+-- a boolean flag indicating whether this ORef can be written to,
+-- the threadID of the owner,
+-- and a value of arbitrary type.
+data Entry = forall v. Typeable v => Entry Readable Writeable ThreadId v
 
 -- | The flag of an entry.
-flag :: Entry -> Bool
-flag (Entry ok _ _) = ok
+readFlag :: Entry -> Bool
+readFlag (Entry r _w _ _) = r
+
+writeFlag :: Entry -> Bool
+writeFlag (Entry _r w _ _) = w
 
 -- | Adjust the flag of an Entry to the given flag
-setEntryFlag :: Bool -> Entry -> Entry
-setEntryFlag b (Entry _ t a) = (Entry b t a)
+setEntryReadFlag :: Bool -> Entry -> Entry
+setEntryReadFlag b (Entry _ w t a) = (Entry b w t a)
 
--- | This will check the flag of an entry and also whether or not the thread ID of the
--- current thread matches the thread specified in the ORef. This is to prevent a
--- child from using ORef's that it inherited from its parent but was not
--- explicitely given.
-checkEntry :: Entry -> IO Bool
-checkEntry (Entry ok thrId _) = do
+-- | Adjust the flag of an Entry to the given flag
+setEntryWriteFlag :: Bool -> Entry -> Entry
+setEntryWriteFlag b (Entry r _ t a) = (Entry r b t a)
+
+-- | Check if an Entry can be read.
+checkEntryReadFlag :: Entry -> IO Bool
+checkEntryReadFlag (Entry r _w thrId _) = do
   threadId <- myThreadId
-  return $ (threadId == thrId) && ok
+  return $ (threadId == thrId) && r
+
+-- | Check if an Entry can be written to.
+checkEntryWriteFlag :: Entry -> IO Bool
+checkEntryWriteFlag (Entry _r w thrId _) = do
+  threadId <- myThreadId
+  return $ (threadId == thrId) && w
+
+-- | Check if the entry is able to be read and written to.
+-- This will also check if the thread ID of the current thread matches the
+-- thread specified in the ORef.
+-- Check the thread is done to prevent a child from using ORef's that it
+-- inherited from its parent but was not explicitely given.
+checkEntry :: Entry -> IO Bool
+checkEntry (Entry r w thrId _) = do
+  threadId <- myThreadId
+  return $ (threadId == thrId) && r && w
+
 
 -- | Check ThreadId will only check whether the thread id of the ORef is the
 -- same as the one listed in the Entry for that ORef.
@@ -77,14 +110,15 @@ checkEntry (Entry ok thrId _) = do
 -- This is to check for a corner-case where a thread is forked and then
 -- the child thread wants to copy the value. In this situation we do not care about
 -- what the entry says since it's okay to copy as long as you are in the same thread.
-checkThreadId :: Entry -> IO Bool
-checkThreadId (Entry _ thrId _) = do
-  threadId <- myThreadId
-  return $ (threadId == thrId)
+-- checkThreadId :: Entry -> IO Bool
+-- checkThreadId (Entry _ thrId _) = do
+--   threadId <- myThreadId
+--   return $ (threadId == thrId)
+
 
 -- | The value of an entry casted to the expected type.
 value :: Typeable a => Entry -> a
-value (Entry _ _ v) = case cast v of
+value (Entry _ _ _ v) = case cast v of
     Just a  -> a
     Nothing -> error "internal cast error"
 
@@ -98,10 +132,10 @@ getEntry (ORef i) = get >>= maybe err return . lookup i . snd
   where err = error ("entry not found: " ++ show i)
 
 -- | Set an entry in the store.
-setEntry :: Typeable a => ORef a -> Bool -> a -> Own ()
-setEntry (ORef i) ok a = do
+setEntry :: Typeable a => ORef a -> Bool -> Bool -> a -> Own ()
+setEntry (ORef i) r w a = do
   thrId <- liftIO $ myThreadId
-  modifyStore (insert i (Entry ok thrId a))
+  modifyStore (insert i (Entry r w thrId a))
 
 -- | Adjust an entry in current store
 --
@@ -110,17 +144,24 @@ adjustEntry :: ORef a -> (Entry -> Entry) -> Own ()
 adjustEntry (ORef i) k = modifyStore (adjust k i)
 
 -- | Delete an entry from the store.
-deleteEntry :: ORef a -> Own ()
-deleteEntry (ORef i) = modifyStore (delete i)
+-- deleteEntry :: ORef a -> Own ()
+-- deleteEntry (ORef i) = modifyStore (delete i)
 
--- | Get the current writeable flag for an ORef.
-getFlag :: ORef a -> Own Bool
-getFlag oref = fmap flag (getEntry oref)
+-- | Get the current flag for reading an ORef.
+getReadFlag :: ORef a -> Own Bool
+getReadFlag oref = fmap readFlag (getEntry oref)
 
--- | Set the Boolean Flag of an ORef in t
--- | Set the current writeable flag for an ORef.
-setFlag :: ORef a -> Bool -> Own ()
-setFlag oref ok = adjustEntry oref (setEntryFlag ok)
+-- | Get the current flag for writing to an ORef.
+getWriteFlag :: ORef a -> Own Bool
+getWriteFlag oref = fmap writeFlag (getEntry oref)
+
+-- | Set the read flag for an ORef.
+setReadFlag :: ORef a -> Bool -> Own ()
+setReadFlag oref b = adjustEntry oref (setEntryReadFlag b)
+
+-- | Set the write flag for an ORef.
+setWriteFlag :: ORef a -> Bool -> Own ()
+setWriteFlag oref b = adjustEntry oref (setEntryWriteFlag b)
 
 -- | Get the current value of an ORef.
 getValue :: Typeable a => ORef a -> Own a
@@ -128,22 +169,15 @@ getValue oref = fmap value (getEntry oref)
 
 -- | Set the current value of an ORef.
 --
--- This will set the value - it will __not__ check ownership or thread
+-- This will set the value - it will __NOT__ check ownership or thread
 setValue :: Typeable a => ORef a -> a -> Own ()
 setValue oref a = do
-    ok <- getFlag oref
-    setEntry oref ok a
-
--- continueOwn :: MonadState s m =>
---   StateT s (EitherT e m) a ->
---   m (Either e a)
--- continueOwn x = do
---   m <- get
---   runEitherT (evalStateT x m)
-  -- runEitherT (get >>= evalStateT x)
+    r <- getReadFlag oref
+    w <- getWriteFlag oref
+    setEntry oref r w a
 
 
--- TODO get rid of?
+-- TODO get rid of continueOwn?
 -- | Evaluate the Ownership monad operations within the context of
 -- and existing Ownership monad.
 --
@@ -183,7 +217,6 @@ startOwn :: (Num t, Monad m) =>
   StateT (t, IntMap a) (EitherT String m) a1 ->
   m (Either String a1)
 startOwn x = runEitherT (evalStateT x (0, empty))
-
 
 -- TODO get rid of? Not clear this is useful
 --

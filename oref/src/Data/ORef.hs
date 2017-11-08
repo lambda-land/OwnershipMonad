@@ -44,16 +44,16 @@ newORef a = do
 
 -- | Remove an ORef from the current context
 --
--- This will fail if we try to drop a thread that we do
+-- This will fail if we try to drop a ORef that we do
 -- not own. For that reason a child thread does not have
 -- The ability to change oref's it can see but are owned
 -- by the parent thread.
 dropORef :: ORef a -> Own ()
 dropORef oref = do
     entry <- getEntry oref
-    ok <- liftIO $ checkEntry entry
+    ok <- liftIO $ checkEntry entry -- TODO change to a different check
     guard ok -- make sure old ORef is writable and doesn't have borrowers.
-    setFlag oref False
+    setFlag oref False -- TODO this would still mean we can read it though
     return ()
 
 -- | Copy the contents of one ORef to another.

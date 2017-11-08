@@ -87,7 +87,7 @@ programming language.
 
 % TODO rework Idris section
 Idris, which treats Uniqueness Types as a subkind of regular Types, shows
-the other way of approaching this and the benefits and tradeoffs of doing so.
+the other way of approaching this and the benefits and trade-offs of doing so.
 By allowing non-unique types to exist and be used along side Unique Types,
 Idris offers a degree of flexibility with it's approach to Uniqueness
 Typing that is not present with ours. % But idris is using it for something
@@ -133,7 +133,7 @@ resource. When the operations inside that monad are complete - the references
 will no longer exist and the resources will be marked as free.
 The information inside of the resource within the \textit{Owned Reference} can
 only be accessed by the provided operations for operating on references within
-the \textit{Onwership Monad}.  These operations will verify whether the
+the \textit{Ownership Monad}.  These operations will verify whether the
 ownership rules are being followed.
 
 The newly created reference \textit{owns} the resource it was given
@@ -224,7 +224,7 @@ Ownership monad.
 
 Much like the Rust language will not allow for a mutable resource to be lent to
 multiple borrowers - neither will the read operation on a ORef.
-The ORef will ensure that the resource is not mutated or writen to while is it
+The ORef will ensure that the resource is not mutated or written to while is it
 lent out to the borrowing function. 
 Because each read operation occurs within the context of the ownership monad the
 resource usage can be tracked and this property can be ensured.
