@@ -16,9 +16,9 @@ singleThreadedWrite = do
   writeORef ref "Quark"
 
   -- create a new channel
-  ch <- newOChan
+  let ch = newOChan
   -- write the oref to the channel -- this removes the oref from the context
-  writeOChan ch ref
+  writeOChan' ch ref
 
   -- TODO this operation should fail resulting in Nothing when the monad is evaluated
   writeORef ref "Odo"

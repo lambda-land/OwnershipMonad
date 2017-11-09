@@ -341,7 +341,7 @@ In order to enforce which thread owns which resource, there would need to be
 some way to track not just what a resource is but also what variable (and what
 thread) owns a resource.
 
-\subsection{Using Owned Reference to Construct Owned Channels}
+\subsection{Using Owned References to Construct Owned Channels}
 
 As discussed earlier, \textit{Owned References} provide a fundamental set of
 rules generalizing resource ownership and how resources may be used within that
@@ -381,7 +381,7 @@ a resource from occurring and does so without having to resort to using an
 additional form of communication between the threads or a resource scheduler.
 This saves adding any additional overhead.
 
-\subsection{Creating an Owned Channel}
+
 
 \subsection{Writing to an Owned Channel}
 
@@ -393,7 +393,7 @@ consumes the \texttt{ORef} and the thread loses the ability to further use the
 
 This operation can conceptually be thought of as the combination of two
 \texttt{ORef} operations - an borrow followed by a drop operation -
-% TODO should we distiguish what kind of borrow?
+% TODO should we distinguish what kind of borrow?
 although these \texttt{ORef} operations are hidden from the user of the
 \texttt{OChan} library.
 
@@ -434,6 +434,19 @@ in that thread.
 
 \subsection{Reading from an Owned Channel}
 
+
+\subsection{Creating an Owned Channel}
+
+Creating an \textit{Owned Channel}, comparatively, is a very simple operation.
+A traditional channel is created through an \texttt{IO} operation and placed
+within the \textit{Ownership Monad}.
+
+It should be noted that there are write and read functions provided
+in the \texttt{OChan} library that can operate on normal \texttt{IO} bound
+channels.  It is reccomended to not use these and instead use write and read
+functions that only operate on \textit{Owned Channel} to safeguard against
+accidentally trying to use the traditional channel write and read functions
+with \texttt{liftIO}.
 
 
 \section{Preventing Deadlock}
