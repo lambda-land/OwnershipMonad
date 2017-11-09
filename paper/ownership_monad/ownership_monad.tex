@@ -423,7 +423,7 @@ borrowed. This immediately follows the completion of the borrow operation. The
 borrow operation used the underlying resource in order to send it to the channel
 and upon completion - as far as the \textit{Ownership Monad} for that thread is
 concerned - the \texttt{ORef} no longer has any borrowers.
-\footnote{Since the borrow just performed a dangerous multithread IO operation
+\footnote{Since the borrow just performed a dangerous multi-threaded IO operation
   it is not entirely true to say that it does not have any borrowers - the
   subsequent drop operation however makes this irrelevant.}
 Because the \texttt{ORef} no longer has any borrowers it is now possible to
@@ -434,6 +434,26 @@ in that thread.
 
 \subsection{Reading from an Owned Channel}
 
+Reading from an \textit{Owned Channel} can be thought of as the reverse of
+writing to an \textit{Owned Channel}.  Rather than take the contents of an
+\texttt{ORef} and give away ownership of the resource inside it - by writing the
+resource to a channel - we are taking ownership of a resource from the channel
+and encapsulating it within a new \texttt{ORef}.
+
+The first \texttt{ORef} operation inside a read from an \textit{Owned Channel}
+is to read from the traditional channel inside the \textit{Owned Channel}. This
+retrieves the resource from the channel and will prevent other threads from
+reading it. This latter aspect leverages a previously existing aspect of
+Haskell Channels. % TODO cite
+
+The second operation is to place the freshly acquired resource inside a new
+\texttt{ORef}.  This \texttt{ORef} will then be returned into the
+\textit{Owership Monad} context by the read operation on the
+\textit{Owned Channel}.  The thread can now have access to the \texttt{ORef}
+and the value within it using the provided operations in the
+\textit{Ownership Monad}.
+
+% TODO add more on Reading
 
 \subsection{Creating an Owned Channel}
 
@@ -443,7 +463,7 @@ within the \textit{Ownership Monad}.
 
 It should be noted that there are write and read functions provided
 in the \texttt{OChan} library that can operate on normal \texttt{IO} bound
-channels.  It is reccomended to not use these and instead use write and read
+channels.  It is recommended to not use these and instead use write and read
 functions that only operate on \textit{Owned Channel} to safeguard against
 accidentally trying to use the traditional channel write and read functions
 with \texttt{liftIO}.
