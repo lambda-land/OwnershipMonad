@@ -29,7 +29,7 @@
 This paper presents a library for Haskell that implements an \textit{ownership-style}
 set of rules for resource-aware programming. This ownership system introduces a
 set of rules that govern how, when, and by whom a resource within what is called
-an Owned reference (an \textit{ORef} ) can be used. While the restrictions this
+an Owned reference (an \texttt{ORef} ) can be used. While the restrictions this
 implementation imposes may seem to increase the complexity of writing programs,
 the resulting guaranties that adhering to these rules facilitates offers
 significant improvements in specific areas. % that have historically been troublesome for Haskell.
@@ -226,26 +226,26 @@ is being borrowed it is prevented from being written to. The function remains
 inside of the context of the Ownership Monad while it executes.
 
 Much like the Rust language will not allow for a mutable resource to be lent to
-multiple borrowers - neither will the borrow operation on a ORef.
-The ORef will ensure that the resource is not mutated or written to while is it
+multiple borrowers - neither will the borrow operation on a \texttt{ORef}.
+The \texttt{ORef} will ensure that the resource is not mutated or written to while is it
 lent out to the borrowing function. 
 Because each borrow operation occurs within the context of the Ownership Monad
 the resource usage can be tracked and this property can be ensured. The
 reference that owns the resource will track the resource while the function
 executes.
 
-The borrow operation also ensures that the original ORef is not able to go away
+The borrow operation also ensures that the original \texttt{ORef} is not able to go away
 before the function borrowing it is complete - this will make sure that the
-function is not referring to an ORef that no longer exists.  The ORef that is
+function is not referring to an \texttt{ORef} that no longer exists.  The \texttt{ORef} that is
 being borrowed by the function is not able to be moved (or otherwise dropped)
 before the function that the resource has been lent to is complete. This is
 enforced by the \textit{move} and \textit{drop} which individually check that
-a ORef does not have any borrowers before they operate on the ORef.
+a \texttt{ORef} does not have any borrowers before they operate on the \texttt{ORef}.
 
 This library also allows multiple functions to simultaneously perform
-\textit{borrow} operations on an existing ORef. This is equivalent to a variable
+\textit{borrow} operations on an existing \texttt{ORef}. This is equivalent to a variable
 being borrowed by more than one immutable borrower in Rust. To do this a
-borrower count is maintained by each ORef and the \textit{writable} flag is not
+borrower count is maintained by each \texttt{ORef} and the \textit{writable} flag is not
 reset until this count is zero.
 
 In this library the borrow operation can only read the value and will not allow
@@ -255,23 +255,23 @@ mutate the reference a different operation is required.
 \subsection{Mutably Borrowing a Resource}
 
 This library also allows a function borrowing a resource to be able to
-write to (or mutate) the resource in the original ORef.  In Rust this would be
+write to (or mutate) the resource in the original \texttt{ORef}.  In Rust this would be
 equivalent to having a single mutable borrower.  The \textit{mutable borrow}
 operation in this library permits the function borrowing that resource to read
-and set the value in the original ORef.
+and set the value in the original \texttt{ORef}.
 
 To allow a mutable borrow it is necessary to know if other functions are
-borrowing the resource.  Each ORef tracks if it has borrowers by keeping a
+borrowing the resource.  Each \texttt{ORef} tracks if it has borrowers by keeping a
 ledger indicating if it is able to be read from or written to and how many
 living borrowers it has.  When a resource has one or more immutable borrowers it
 is no longer able to be written to - but it can still be read from.
-The reason why ORef's have two flags - one for read and one for write - is that
+The reason why \texttt{ORef}'s have two flags - one for read and one for write - is that
 if a resource can be both read from and written to then we know it doesn't have
 any borrowers; if it cannot be read from or written to we know it was either
 dropped or it currently already has a mutable borrower.
 In order to allow one borrower to be able to mutate the resource it is required
 that it is the only borrower of the resource at that time. % TODO rework
-A mutable borrow is prevented from happening is the ORef is not writable.
+A mutable borrow is prevented from happening is the \texttt{ORef} is not writable.
 
 % TODO Mention the Idris approach of borrows
 
@@ -282,24 +282,177 @@ The value within the resource can be updated and changed through the reference
 that owns the resource. This operation can be performed safely because the usage
 of the underlying resource is tracked by the ownership monad.
 
-% The key to allowing multiple (potential mutable) operations to occur on a
-% resource is to make sure that they will not occur simultaneously.
+\subsection{Dropping an Owned Reference}
+
+The \textit{drop} operation will remove an \textit{Owned Reference} from the
+\textit{Ownership Monad} it previously existing in. This will destroy the
+resource from the point of view of that Owership context. Any further operations
+will be prevented from occuring using the dropped reference. In order to be
+dropped a resource must not have any borrowers, it must exist in that context,
+and it must be readable and writable. If not the drop operation will not be
+allowed to occur.
 
 
 \section{Move Semantics}
 
 \subsection{Behavior}
 
-With the Ownership system enforcing the rules dictating how a resource can be
-used
+TODO
+
+% With the Ownership system enforcing the rules dictating how a resource can be
+% used
 
 \section{ORef's}
-ORef's section
 
-% \chapter{Conclusion}
-% TODO
-% \section{}
+TODO ORef's example section
 
+
+\chapter{Owned Channels}
+
+\section{Introduction}
+
+\textit{Owned Channels} expand on the concept of using channels between threads
+to write to and read from a shared location.   As with traditional Channels,
+this location can be used by concurrent threads in order to share resources and
+to communicate.
+
+% Shared state brings with it all the dangers associated with it. REWORK
+% As our example shows - issues can crop up when resources are shared between
+% threads. % TODO add example
+
+\textit{Owned Channels} operate using the idea that instead of sending just the
+resource across a channel - send the ownership of the resource as well.
+The key idea behind \textit{Owned Channels} is for the thread sending a
+resource across a channel to relinquish ownership over the resource.
+A thread reading a resource from the channel automatically gains ownership over
+the resource it consumes from the channel.
+
+Once a thread has sent a resource over the channel - all operations in the thread
+will need to be prevented from using that resource.
+If the thread later needed to use the resource again it would have to read the
+resource from a channel and gain back ownership over the resource.
+
+Traditionally the variable that was written to a channel would still exist in the
+scope of the code in the thread that originally wrote the resource to a channel.
+As a result it would be perfectly legal to write code that later referred to the
+resource through an existing variable binding in the original thread.
+% TODO refer to a code example for this
+In order to enforce which thread owns which resource, there would need to be
+some way to track not just what a resource is but also what variable (and what
+thread) owns a resource.
+
+\subsection{Using Owned Reference to Construct Owned Channels}
+
+As discussed earlier, \textit{Owned References} provide a fundamental set of
+rules generalizing resource ownership and how resources may be used within that
+context.  Within the \textit{Ownership Monad} it is possible to use the
+resources in \textit{Owned References} safely knowing that any violations of
+the ownership rules will be caught and prevented.  For that reason
+\textit{Owned References}  provide an useful building block for constructing
+larger abstractions that are concerned with tracking resource ownership.
+
+The key to allowing multiple (potentially mutable) concurrent operations to occur
+on a shared resource is to make sure that they will not occur simultaneously.
+% TODO explain that this is not a new idea and refer to existing mutex locks and
+% so on?
+As the chapter introduction alluded - one solution to this problem is to
+create a system for shared access to resources that tracks both who owns the
+resource in addition to what the resource is.
+Using \textit{Owned References} as a building block it is quite easy to build
+such a system. Additionally it is possible to do so on top of the existing
+Channel interface and the concurrency abstractions which Channels provide in
+Haskell.
+
+
+\section{Owned Channel Operations}
+
+A major idea that \textit{Owned Channels} take advantage of is that ownership
+of resources - once granted - can be tracked and used in isolation. For that reason
+each thread can exist inside its own \textit{Ownership Monad} bubble and
+remain isolated from the state of resources which exist in other threads.
+% TODO add diagram of Ownership Monad "bubbles"
+The act of giving up ownership - on write operations - is enough information to
+facilitate the transfer of resource ownership between threads.
+% TODO add example to back this up
+Beyond keeping track of this inter-thread ownership information - which is
+facilitated by the \textit{Owned Channel} operations - each thread will be able
+to govern its own resources.  This prevents any accidental shared ownership of
+a resource from occurring and does so without having to resort to using an
+additional form of communication between the threads or a resource scheduler.
+This saves adding any additional overhead.
+
+\subsection{Creating an Owned Channel}
+
+\subsection{Writing to an Owned Channel}
+
+Writing to an \textit{Owned Channel} takes the contents of an \texttt{ORef} in
+one thread and writes it to the Channel - the shared state bewteen the threads.
+From the view-point of the thread that wrote to the channel - this operation
+consumes the \texttt{ORef} and the thread loses the ability to further use the
+\texttt{ORef} in later operations.
+
+This operation can conceptually be thought of as the combination of two
+\texttt{ORef} operations - an borrow followed by a drop operation -
+% TODO should we distiguish what kind of borrow?
+although these \texttt{ORef} operations are hidden from the user of the
+\texttt{OChan} library.
+
+To write an \texttt{ORef} to a Channel, the \textit{Owned Channel} operation
+needs to use the value that the \textit{Owned Reference} refers to.  This means
+that before any further operations can occur the \texttt{ORef} must not have any
+borrowers and it must exist within the context of that \textit{Ownership Monad}.
+If those conditions are satisfied then the first of the two \texttt{ORef}
+operations can occur.
+
+In order to write the resource inside the \texttt{ORef} to a traditional Channel
+- inside the \textit{Owned Channel} - the function writing the resource to the
+Channel needs to borrow the resource.
+This might seem odd since it would appear that the borrower function does not
+intend to ever return the resource.  This is accurate, the resource that was
+written to the channel will not be returned; under the rules for an immutable
+borrow this kind of use is actually allowed.  If it were not for the fact that
+the borrower function acts on resources shared between threads there would not be
+any issue.  Given the nature of concurrent operation between threads - doing
+this step alone with the function to write to a channel - would be considered
+dangerous.  It is also crucial to remember that this is still occurring inside
+the larger \textit{Owned Channel} write operation and will be opaque to the user
+of the library.
+
+The second \texttt{ORef} operation is to drop the \texttt{ORef} that was just
+borrowed. This immediately follows the completion of the borrow operation. The
+borrow operation used the underlying resource in order to send it to the channel
+and upon completion - as far as the \textit{Ownership Monad} for that thread is
+concerned - the \texttt{ORef} no longer has any borrowers.
+\footnote{Since the borrow just performed a dangerous multithread IO operation
+  it is not entirely true to say that it does not have any borrowers - the
+  subsequent drop operation however makes this irrelevant.}
+Because the \texttt{ORef} no longer has any borrowers it is now possible to
+drop it from that monad using the \texttt{ORef} drop operation.  This will
+update the resource ledger for that monad - crucially without touching the
+resource itself - and prevents any further operations from using that resource
+in that thread.
+
+\subsection{Reading from an Owned Channel}
+
+
+
+\section{Preventing Deadlock}
+% Describe/Define Deadlock
+TODO
+
+\subsection{Explicit Resource Ownership Prevents Deadlock}
+% How ownership prevents deadlock
+TODO
+
+\section{Beyond Threads}
+
+TODO
+
+How Ownership could be used for resources between processes using D-Bus and also
+servers in distributed computing.
+
+\chapter{Conclusion}
+\section{TODO}
 
 \bibliographystyle{plain}
 \bibliography{ownership_monad}{}

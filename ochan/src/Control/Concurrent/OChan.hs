@@ -30,7 +30,7 @@ newOChan = do
 writeOChan :: Typeable a => Chan a -> ORef a -> Own ()
 writeOChan ch oref = do
   -- write the contents of the ORef to the Channel
-  readORef oref (\v -> liftIO $ writeChan ch v)
+  borrowORef oref (\v -> liftIO $ writeChan ch v)
   -- Remove the oref from the ownership context
   dropORef oref
 
