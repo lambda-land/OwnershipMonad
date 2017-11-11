@@ -41,7 +41,6 @@ writeOChan ch oref = do
 writeOChan' :: Typeable a => OChan a -> ORef a -> Own ()
 writeOChan' ch oref = do
   (ch >>= (\x -> writeOChan x oref))
-  -- dropORef oref
 
 -- | Read the contents of a channel in to an Owned context
 --

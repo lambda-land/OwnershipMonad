@@ -1,6 +1,9 @@
 module Main where
 
 import Control.Monad.IO.Class (liftIO)
+import Control.Concurrent
+
+import Data.Typeable (Typeable)
 
 import Data.ORef
 
@@ -234,6 +237,46 @@ darkMagic x = startOwn $ do
   borrowORef ref (\a -> return (a + 1))
 
 
+-- | deadlock with normal MVars
+--
+-- If you run this in ghci, it will usually—but not always—print nothing.
+-- 
+-- Adapted from Real World Haskell's example on deadlock with MVar's
+-- TODO Cite Chapter 24 of Real World Haskell
+nestedModification outer inner = do
+  modifyMVar_ outer $ \x -> do
+    yield  -- force this thread to temporarily yield the CPU
+    modifyMVar_ inner $ \y -> return (y + 1)
+    return (x + 1)
+  putStrLn "done"
+
+deadlockMVar = do
+  a <- newMVar 1
+  b <- newMVar 2
+  forkIO $ nestedModification a b
+  forkIO $ nestedModification b a
+  
+-- |  with normal mvars
+-- Adapted for ORef from Real World Haskell's example on deadlock with MVar's
+-- TODO Cite Chapter 24 of Real World Haskell
+nestedModificationORef :: (Typeable a, Num a) => ORef a -> ORef a -> Own ()
+nestedModificationORef outer inner = do
+  mutableBorrowORef outer $ \x -> do
+    liftIO $ yield  -- force this thread to temporarily yield the CPU
+    mutableBorrowORef inner $ \y -> return (y + 1)
+    return (x + 1)
+  liftIO $ putStrLn "done - ORef deadlock example"
+
+deadlockORef :: Own ()
+deadlockORef = do
+  a <- newORef (1 :: Int)
+  b <- newORef 2
+  forkOwn $ nestedModificationORef a b
+  liftIO $ threadDelay 1000 -- Wait a second just so that the output is printed nicely
+  forkOwn $ nestedModificationORef b a
+  return ()
+
+
 main :: IO ()
 main = do
   putStrLn "\nStarting ORef Library Tests."
@@ -308,3 +351,17 @@ main = do
 
   m <- magic 1
   putStrLn (show m)
+
+  -- Run these two in GHCi
+  
+  putStrLn "\nDeadlock MVar"
+  dlmv <- deadlockMVar
+  putStrLn $ show dlmv
+
+  threadDelay 1000
+
+  putStrLn "\nORef example with no deadlock"
+  -- this should fail - not with an exception but with a Left String
+  dlor <- startOwn deadlockORef :: IO (Either String ())
+  threadDelay 1000
+  putStrLn $ show dlor
