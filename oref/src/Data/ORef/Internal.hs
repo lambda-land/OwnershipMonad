@@ -11,6 +11,7 @@ module Data.ORef.Internal
   , incBC
   , decBC
   , hasBorrowers
+  , hasOtherBorrowers
   -- , readFlag
   -- , writeFlag
   -- , setEntryReadFlag
@@ -84,7 +85,7 @@ addToBorrowerCount newB (Entry r w bc thID v) = (Entry r w (bc + newB) thID v)
 
 -- | Decrease the borrower count by a certain number
 reduceBorrowerCount :: Int -> Entry -> Entry
-reduceBorrowerCount lessB (Entry r w bc thID v) = (Entry r w (bc + lessB) thID v)
+reduceBorrowerCount lessB (Entry r w bc thID v) = (Entry r w (bc - lessB) thID v)
 
 incBC :: ORef a -> Own ()
 incBC oref = adjustEntry oref (addToBorrowerCount 1)
@@ -92,10 +93,19 @@ incBC oref = adjustEntry oref (addToBorrowerCount 1)
 decBC :: ORef a -> Own ()
 decBC oref = adjustEntry oref (reduceBorrowerCount 1)
 
+
 hasBorrowers :: ORef a -> Own Bool
 hasBorrowers oref = do
   bc <- getBorrowerCount oref
   return (bc > 0)
+
+-- | hasOtherBorrowers will return if there are other borrowers
+-- other than the ORef calling the function - this assumes
+-- that hasOtherBorrowers will be used by a borrower
+hasOtherBorrowers :: ORef a -> Own Bool
+hasOtherBorrowers oref = do
+  bc <- getBorrowerCount oref
+  return (bc - 1 > 0)
 
 -- | The flag of an entry.
 readFlag :: Entry -> Bool
@@ -221,7 +231,7 @@ setValue oref a = do
 
 -- TODO get rid of continueOwn?
 -- | Evaluate the Ownership monad operations within the context of
--- and existing Ownership monad.
+-- an existing Ownership monad.
 --
 -- This will use the state from the previous context.
 continueOwn :: Own a -> Own (Either String a)

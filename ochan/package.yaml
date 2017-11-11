@@ -16,6 +16,10 @@ dependencies:
   - oref
   - mtl == 2.2.1
   - transformers
+  # for the tests
+  - async
+  - text
+  - bytestring
 
 library:
   source-dirs: src

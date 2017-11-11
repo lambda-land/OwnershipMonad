@@ -2,11 +2,16 @@ module Main where
 
 import Control.Concurrent
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Trans.Class (lift)
-import Data.Typeable
 
-import Control.Concurrent.OChan
+import Control.Concurrent.Async
+import Control.Monad (forever)
+import Data.Text (Text, pack)
+import Data.Text.Encoding (encodeUtf8)
+import qualified Data.ByteString.Char8 as S8
+
+
 import Data.ORef
+import Control.Concurrent.OChan
 
 singleThreadedWrite :: Own ()
 singleThreadedWrite = do
@@ -20,7 +25,6 @@ singleThreadedWrite = do
   -- write the oref to the channel -- this removes the oref from the context
   writeOChan' ch ref
 
-  -- TODO this operation should fail resulting in Nothing when the monad is evaluated
   writeORef ref "Odo"
   -- ^^ writing to a ref that's no longer owned
 
@@ -57,7 +61,7 @@ chanTest = do
       -- this places ownership of the resource in the channel within the
       -- context of the child thread
       return ()
-    case ex of
+    case ex of -- TODO make sure to get the output to the test log file
       Left err -> do putStrLn ("Error" ++ err)
       Right _ -> do putStrLn "Success"
   return ()
@@ -100,21 +104,24 @@ forkedWriteExample = do
   return ()
 
 
+
+
+
 main :: IO ()
 main = do
   -- example 1 --
   putStrLn "Running example 1"
   example1 <- startOwn singleThreadedWrite -- TODO example1 :: Either String ()
-  putStrLn "The example should result in an Error"
-  putStrLn $ "The example resulted in " ++ show example1
+  putStrLn "Example 1 should result in an Error"
+  putStrLn $ "Example 1 resulted in " ++ show example1
 
   -- example 2 --
   putStrLn "Running example 2"
   example2 <- startOwn chanTest
   -- putStrLn "The example should result in "
-  putStrLn $ "The example resulted in " ++ show example2
+  putStrLn $ "Example 2 resulted in " ++ show example2
 
   -- example 3 --
   putStrLn "Running example 3"
   example3 <- startOwn forkedWriteExample
-  putStrLn $ "The example resulted in " ++ show example3
+  putStrLn $ "Example 3 resulted in " ++ show example3

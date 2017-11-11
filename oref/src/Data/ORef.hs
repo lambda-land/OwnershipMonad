@@ -51,10 +51,14 @@ newORef a = do
 dropORef :: ORef a -> Own ()
 dropORef oref = do
     ok <- checkORef oref  -- Check Read and Write
-    guard ok   -- make sure old ORef is writable and doesn't have borrowers.
-    setWriteFlag oref False
-    setReadFlag oref False
-    return ()
+    case ok of
+      False -> lift $ left "Error during drop operation - \
+                           \make sure old ORef is writable and doesn't have\
+                           \ borrowers."
+      True -> do
+        setWriteFlag oref False
+        setReadFlag oref False
+        return ()
 
 -- | Copy the contents of one ORef to another.
 --
@@ -65,11 +69,13 @@ copyORef oref = do
     (new, store) <- get
     entry <- getEntry oref
     ok <- liftIO $ checkEntryReadFlagThread entry -- TODO check borrower count here too?
-    guard ok
-    -- the new entry is a copy of the old entry but with the write flag set as True
-    let newEntry = setEntryWriteFlag True entry
-    put (new + 1, insert new newEntry store)
-    return (ORef new)
+    case ok of
+      False -> lift $ left "Error during copy operation"
+      True -> do
+        -- the new entry is a copy of the old entry but with the write flag set as True
+        let newEntry = setEntryWriteFlag True entry
+        put (new + 1, insert new newEntry store)
+        return (ORef new)
 
 
 -- | Move the contents of one ORef to a new ORef.
@@ -142,22 +148,22 @@ borrowORef oref k = do
     -- This will check if we can read the entry and if it is in our thread
     -- We do not intend to write to it so we do not need to check that
     case ok of
-      False -> lift $ left "Error during read operation - checking if the \
-                           \ entry was in in the same thread or if it could be \
-                           \ read returned false."
+      False -> lift $ left "Error during borrow operation - this occured while\
+                           \ checking if the entry was in in the same thread\
+                           \ or if it could be read returned false."
       True -> do
-        setWriteFlag oref False
+        setWriteFlag oref False  -- set the oref write flag to false since it is being borrowed
         incBC oref -- add a borrower
-        -- set the oref write flag to false since it is being borrowed
         b <- k (value e) -- use the value in the oref
         decBC oref -- remove a borrower
-        otherBorrowers <- hasBorrowers oref
+        otherBorrowers <- hasOtherBorrowers oref
         if otherBorrowers
             then do
                 return b
             else do -- we are the last borrower
                 setWriteFlag oref True
-                -- set the oref write to true since it is not longer being borrowed (and can be written to)
+                -- set the oref write to true since it is not longer being
+                -- borrowed (and can be written to.)
                 return b  -- return the result of using the function on ORef a
 
 -- | Borrow an ORef in a mutable way.
