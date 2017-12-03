@@ -104,6 +104,33 @@ forkedWriteExample = do
   return ()
 
 
+-- GHC's runtime does not specify an order for how it executes the code
+-- in threads. -cite Real World Haskell
+--
+-- The OChan system for synchronizing resource use between threads
+-- is one way to protect against this.
+
+-- say :: Text -> IO ()
+-- say = S8.putStrLn . encodeUtf8
+
+-- worker :: OChan Int -> Int -> Own ()
+-- worker chan num = forever $ do
+--     ref <- readOChan' chan
+--     s <- borrowORef ref (\x -> return x)
+--     liftIO $ say $ pack $ concat
+--         [ "Worker #"
+--         , show num
+--         , " received value "
+--         , show s
+--         ]
+
+-- test :: Own ()
+-- test = do
+--     chan <- newOChan
+--     liftIO $ concurrently
+--       (mapConcurrently (liftIO . (worker chan)) [1..5])
+--       (mapM_ (writeOChan chan) [1..10])
+--     return ()
 
 
 

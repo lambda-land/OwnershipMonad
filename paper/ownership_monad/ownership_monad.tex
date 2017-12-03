@@ -26,43 +26,66 @@
 \chapter{Introduction}
 \section{Introduction}
 
-This paper presents a library for Haskell that implements an \textit{ownership-style}
-set of rules for resource-aware programming. This ownership system introduces a
-set of rules that govern how, when, and by whom a resource within what is called
-an Owned reference (an \texttt{ORef} ) can be used. While the restrictions this
-implementation imposes may seem to increase the complexity of writing programs,
-the resulting guaranties that adhering to these rules facilitates offers
-significant improvements in specific areas. % that have historically been troublesome for Haskell.
+This project report presents a library for Haskell that implements an
+\textit{ownership-system} for resource-aware programming. This ownership system
+introduces a set of rules that govern how, when, and by whom a resource within
+what is called an Owned reference (an \texttt{ORef}) can be used.
+While the restrictions this implementation imposes may seem to increase the
+complexity of writing programs, the resulting guaranties that adhering to these
+rules facilitates offers significant improvements in specific areas.
 
 Adding a way to keep track of resources in a pure language like Haskell may
 at the onset seem unnecessary since in a pure language, by definition, % TODO Add citation
 the data making up the resources bound to variables are immutable. Because of
-this there is inherent changing state.  Haskell's purity allows for referential
+this there is no inherent state.  Haskell's purity allows for referential
 transparency where values and variables can be thought of as being
 interchangeable in the sense that under any context evaluating an expression will
-always lead to the same result.  This is a very desirable property that
-Haskell's purity grants and it allows for a greater ability to reason about the
-behavior of a program.
+always lead to the same result.
+Referential transparency is a very desirable property which allows for a greater
+ability to reason about the behavior and correctness of a program.
 
 Unfortunately even in a pure language like Haskell, this property breaks down in
-the context of concurrency.  Concurrency introduces a changing state as separate
-threads interleave actions.  Under some circumstances this can make a program
-in Haskell look and act as though it were an imperative language.
+the context of concurrency.  In order to allow separate threads to communicate
+the basic mechanisms provided by Concurrent Haskell introduce mutable state.
+Adding mutable state and sharing it between threads explicitly introduces
+side-effects into otherwise pure and referentially transparent computations.
+Under these circumstances, Haskell's usual approach of segregating side-effects
+into monadic computations does not resolve every issue can exist with shared-state
+concurrency.
+
+Linear types are often suggested as a possible solution for issues that result
+from mutable state \cite{Wadler90lineartypes} and concurrency
+\cite{caires2010session}.  Language level support for linear types has been
+proposed for the Glasgow Haskell Compiler. \cite{LinearTypesGHC}
+% This would add plain linear types, directly inspired from linear logic.
+Ways to add Linear types to Haskell without language level support have also
+been demonstrated using embdedded domain specific languages within a monadic
+context. \cite{Paykin:2017:LM:3122955.3122965}
+
+Linear types however can become cumbersome to work with.
+Other less restrictive forms logic have been used in type systems for similar
+resource tracking.
+Affine type systems weaken the restrictions imposed by Linear types system.
+Instead of requiring every variable to be used exactly once - as is the case
+with linear types - every variable must be used at most once. The language level
+Ownership typing in Rust has been directly inspired by Affine type systems. 
+% TODO cite other languages
 
 Concurrent Haskell programs can still fall prey to the same fundamental
 problems that other impure languages can, namely deadlock and starvation.
 % TODO add citation for shared-state concurrency is still hard section from Real
 % World Haskell
-This paper will demonstrate what some of these problems look like using
+This project report will demonstrate what some of these problems look like using
 basic concurrency tools available in Haskell such as shared state with
-MVars and message passing with channels.
+MVar's and message passing with channels. In Concurrent Haskell the most basic
+way to allow separate threads to communicate is with a shared mutable variable.
+
 It will then demonstrate and explain the benefits of tracking resource usage
 with a set of rules similar to affine types. The contribution that
 tracking resources while they are being used and sent between threads
 will be shown. % TODO rework this sentence
 
-% --
-\section{Additional contributions}
+\section{Contributions}
 
 While this library does not do so - by tracking resources with the ownership
 system it becomes in theory possible to reason about the memory usage over the
@@ -99,7 +122,6 @@ Typing that is not present with ours. % But idris is using it for something
 % increases our confidence and ability to know when a resource is finished being used.
 % refer to Edwin Brady quote at:
 % https://groups.google.com/d/msg/idris-lang/Z28F3MBBtTM/XOnUcrvsBAAJ
-
 
 \chapter{The Ownership Monad}
 
