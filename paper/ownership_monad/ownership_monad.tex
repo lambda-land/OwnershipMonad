@@ -27,20 +27,24 @@
 \section{Introduction}
 
 This project report presents a library for Haskell that implements an
-\textit{ownership-system} for resource-aware programming. This ownership system
+\textit{ownership system} for resource aware programming. This ownership system
 introduces a set of rules that govern how, when, and by whom a resource within
-what is called an Owned reference (an \texttt{ORef}) can be used.
+what is called an \textit{Owned Reference} (an \texttt{ORef}) can be used.
+
 While the restrictions this implementation imposes may seem to increase the
 complexity of writing programs, the resulting guaranties that adhering to these
-rules facilitates offers significant improvements in specific areas.
+rules facilitates offers improvements in specific areas. Furthermore
+applying this system provides an example for how monadic based systems with fewer
+restrictions than Linear Types can offer many of the same abilities to reason about
+resource use without becoming as unwieldly as some linear type systems. 
 
 Adding a way to keep track of resources in a pure language like Haskell may
 at the onset seem unnecessary since in a pure language, by definition, % TODO Add citation
-the data making up the resources bound to variables are immutable. Because of
-this there is no inherent state.  Haskell's purity allows for referential
+the data making up the resources bound to variables is immutable. Because of
+this there is no inherent state.  Haskell's purity therefore allows for referential
 transparency where values and variables can be thought of as being
 interchangeable in the sense that under any context evaluating an expression will
-always lead to the same result.
+always lead to the same result. % TODO change this sentence
 Referential transparency is a very desirable property which allows for a greater
 ability to reason about the behavior and correctness of a program.
 
