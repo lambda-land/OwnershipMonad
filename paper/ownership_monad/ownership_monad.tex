@@ -142,27 +142,52 @@ resources are used - certain properties can be enforced.
 
 % TODO briefly what these are here
 
+% The type of the \texttt{Own} monad
+
 \section{The Ownership System}
 
 Resources are bound to a variable once they are created inside the Ownership
 Monad.  These variables are the mechanism to access - or refer - to the
-underlying resource.  In the library these are called ORef's -
+underlying resource.  In the library these variables are called ORef's -
 or \textit{Owned References}.
 
 \subsection{Reference Creation}
 
-An owned reference is created within the Ownership Monad and bound to a
-resource. When the operations inside that monad are complete - the references
-will no longer exist and the resources will be marked as free.
-The information inside of the resource within the owned reference can
-only be accessed by the provided operations for operating on references within
-the ownership monad.  These operations will verify whether the
-ownership rules are being followed.
+An owned reference \texttt{ORef} is created within the Ownership Monad and bound
+to a resource with the \texttt{newORef} function.
 
-The newly created reference \textit{owns} the resource it was given
-when it was created. Resources that are put into references can only have one
-owner at any given time. This reference bound to the newly initialized resource
-becomes the sole owner of that resource.
+\begin{verbatim}
+newORef :: Typeable a => a -> Own (ORef a)
+\end{verbatim}
+
+When the operations inside that monad are complete - the references
+will no longer exist and the resources will be marked as free.
+% TODO this is actually quite significant and worth explaining more because it
+% allows us to determine when a resource no longer needs to exist.
+% (can be automatically destroy and freed)
+% Explain that ORef's are dropped once the monad is finished evaluating - and we
+% know they can be dropped then.
+The information inside of the resource which is bound to the owned reference can
+only be accessed by the provided operations for references within the ownership
+monad.
+
+These operations which act on owned references will verify whether the ownership
+rules are being followed and prevent violations.
+
+Resources that are put into references can only have one owner at any given
+time. The reference bound to the newly initialized resource becomes the sole
+owner of that resource. 
+The type of an \texttt{ORef} is a thin wrapper around a way to tag and identify
+resources.
+
+\begin{verbatim}
+data ORef a = ORef ID
+\end{verbatim}
+
+An \texttt{ORef} is a parameterized abstract data type. The polymorphic
+\texttt{a} allows any type to be stored in an \texttt{ORef}.
+This datatype serves to provide a handle on each resource for the \texttt{Own}
+monad to use as it enforces ownership typing rules and tracks each resource.
 
 \subsection{Copying a Reference}
 
@@ -171,6 +196,10 @@ within the scope of that ownership monad.  When this occurs the new references i
 created and is then given ownership over their copy of the resource.  After a
 copy operation is performed the two references will each own what are now,
 essentially, two separate and different resources.
+
+\begin{verbatim}
+copyORef :: ORef a -> Own (ORef a)
+\end{verbatim}
 
 For those familiar with the terminology from the Rust programming language, the
 term \textit{copy} here is not the same as a copy in Rust. Rust makes a special
@@ -195,6 +224,13 @@ be possible to refer to the underlying resource through the old reference. This
 operation removes the old reference from the scope of the ownership monad it
 previously existed in and the new reference is now the sole owner of the
 resource.
+
+The library function for moving resources from one \texttt{ORef} to another has
+the following type:
+
+\begin{verbatim}
+moveORef :: ORef a -> Own (ORef a)
+\end{verbatim}
 
 Move operations provide a way for a references to interact with
 other references and provide a building block for larger more complex
@@ -242,9 +278,16 @@ multiple variables (or functions) are not allowed.
 
 This library takes a slightly different approach: instead of letting variables
 borrow a resource, a borrow operation instead lends the resource to a function
-which temporarily borrows the resource in order to use it.  While the resource
-is being borrowed it is prevented from being written to. The function remains
-inside of the context of the Ownership Monad while it executes.
+which temporarily borrows the resource in order to use it.
+
+While the resource is being borrowed it is prevented from being written to.
+The function that borrows the resource is of type \texttt{(a -> Own b)}. The
+resource being consumed in the function remains inside of the context of the
+Ownership Monad while the function executes.
+
+\begin{verbatim}
+borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
+\end{verbatim}
 
 Much like the Rust language will not allow for a mutable resource to be lent to
 multiple borrowers - neither will the borrow operation on a \texttt{ORef}.
@@ -281,6 +324,10 @@ equivalent to having a single mutable borrower.  The \textit{mutable borrow}
 operation in this library permits the function borrowing that resource to read
 and set the value in the original \texttt{ORef}.
 
+\begin{verbatim}
+mutableBorrowORef :: Typeable a => ORef a -> (a -> Own a) -> Own ()
+\end{verbatim}
+
 To allow a mutable borrow it is necessary to know if other functions are
 borrowing the resource.  Each \texttt{ORef} tracks if it has borrowers by keeping a
 ledger indicating if it is able to be read from or written to and how many
@@ -303,16 +350,27 @@ The value within the resource can be updated and changed through the reference
 that owns the resource. This operation can be performed safely because the usage
 of the underlying resource is tracked by the ownership monad.
 
+\begin{verbatim}
+writeORef :: Typeable a => ORef a -> a -> Own ()
+\end{verbatim}
+
+The existing resource in side the ORef is over written by the new value.
+
 \subsection{Dropping an Owned Reference}
 
-The \textit{drop} operation will remove an owned reference from the
-ownership monad it previously existing in. This will destroy the
-resource from the point of view of that ownership context. Any further operations
-will be prevented from occurring using the dropped reference. In order to be
-dropped a resource must not have any borrowers, it must exist in that context,
-and it must be readable and writable. If not the drop operation will not be
-allowed to occur.
+The \textit{drop} operation will explicitely remove an owned reference from the
+ownership monad it previously existed in.
+This will destroy the resource from the point of view of that ownership context.
 
+\begin{verbatim}
+dropORef :: ORef a -> Own ()
+\end{verbatim}
+
+Any further operations will be prevented from occurring using the dropped
+reference. In order to be dropped: a resource must not have any borrowers,
+it must exist in that context,
+and it must be readable and writable.
+Otherwise the drop operation will not be permitted.
 
 \section{Move Semantics}
 
