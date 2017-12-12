@@ -120,45 +120,84 @@ with a set of rules similar to affine types.
 \chapter{The Ownership Monad}
 
 The term \textit{Ownership System} is used to describe the system for how
-resources are tracked and how they can be used once they are created.
+resources are tracked and how they can be used once they are created. This
+system operates within the context of the ownership monad.
 \textit{Move Semantics} describe the outcome from using the operations provided
-for the Ownership System.
+for the ownership system.
 
-Approaching resource usage with this style of implementation is not a new
-concept. Restricting all entities to following the rules specified under an
-affine type system discipline is applied under the Ownership System in the Rust
-programming language. 
+The ownership system and move semantics this library implements are inspired by
+ownership typing in Rust as well as Uniqueness Types
+from Idris.\cite{rust_book_ownership} \cite{idris_uniqueness_types}
+% Restricting all entities to following the rules specified under an
+% affine typing system discipline is applied under the ownership typing system in
+% the Rust programming language. % TODO rework
+The ownership system described by this paper approximates some of the
+features from ownership typing in the Rust language - differences between
+the two result from the different language paradigms and the different use cases.
 
-The ownership system and move semantics this library
-implements are inspired by the Ownership system in Rust as well as
-Uniqueness types from Idris.\cite{rust_book_ownership} \cite{idris_uniqueness_types}
-The Ownership System described by this paper approximates some of the
-features from the Rust language but differences between the two result from the
-different language paradigms and the different use cases.
-
-Uniqueness types in Idris, ownership in Rust, and the Ownership Monad.
+Uniqueness types in Idris, ownership typing in Rust, and the ownership system
 make use of the idea that by tracking resource use and applying rules to how
 resources are used - certain properties can be enforced.
-
 % TODO briefly what these are here
 
-% The type of the \texttt{Own} monad
+The type of the ownership monad:
+
+% Ownership Monad with IO in the transformers stack
+
+\begin{verbatim}
+type Own a = StateT (ID,Store) (EitherT String IO) a
+\end{verbatim}
+
+State is represented using the \texttt{StateT} monad transformer.
+The ownership monad needs to track the state of ownership system operations
+that occur within its context but it does not need to be aware of the
+operations occurring in other ownership monads. This latter aspect will become
+important when discussing Owned Channels between separate threads later on.
+
+% TODO explain what's in the entry datatype
 
 \section{The Ownership System}
 
-Resources are bound to a variable once they are created inside the Ownership
-Monad.  These variables are the mechanism to access - or refer - to the
+Resources are bound to a variable once they are created inside the ownership
+monad.  These variables are the mechanism to access - or refer - to the
 underlying resource.  In the library these variables are called ORef's -
 or \textit{Owned References}.
 
 \subsection{Reference Creation}
 
-An owned reference \texttt{ORef} is created within the Ownership Monad and bound
-to a resource with the \texttt{newORef} function.
+The \texttt{newORef} function creates a new owned reference
+within the ownership monad and places the value provided to the function
+inside the reference. 
 
 \begin{verbatim}
 newORef :: Typeable a => a -> Own (ORef a)
+newORef a = do
+    (new,store) <- get
+    thrId <- liftIO $ myThreadId
+    let entry = (Entry True True 0 thrId a)
+    put (new + 1, insert new entry store)
+    return (ORef new)
 \end{verbatim}
+
+The current state of the monad is needed in order
+to produce the new state which will include the new owned reference.
+The new owned reference is a mapping of an ID and the entry which contains
+the value and state of the owned reference.
+Performing \texttt{get} will return the ID to use next as well as the current
+mapping of owned reference ID's and their entries.
+
+In order to prevent the child threads from using the owned references that
+were potentially inherited through the namespacing scope of their parent
+threads - the thread ID of the thread that created the owned reference must
+be stored.
+This is set when the owned reference is initially created and requires
+an \texttt{IO} operation to get the current thread ID of the thread
+creating the new \texttt{ORef}.
+
+The entry that will be inserted into the new mapping will have its read and
+write flags initially set to true and its borrower count initialized to zero.
+It will also consist of the thread ID of its creator and the value to store.
+
 
 When the operations inside that monad are complete - the references
 will no longer exist and the resources will be marked as free.
@@ -283,7 +322,7 @@ which temporarily borrows the resource in order to use it.
 While the resource is being borrowed it is prevented from being written to.
 The function that borrows the resource is of type \texttt{(a -> Own b)}. The
 resource being consumed in the function remains inside of the context of the
-Ownership Monad while the function executes.
+ownership monad while the function executes.
 
 \begin{verbatim}
 borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
@@ -293,7 +332,7 @@ Much like the Rust language will not allow for a mutable resource to be lent to
 multiple borrowers - neither will the borrow operation on a \texttt{ORef}.
 The \texttt{ORef} will ensure that the resource is not mutated or written to while is it
 lent out to the borrowing function. 
-Because each borrow operation occurs within the context of the Ownership Monad
+Because each borrow operation occurs within the context of the ownership monad
 the resource usage can be tracked and this property can be ensured. The
 reference that owns the resource will track the resource while the function
 executes.
