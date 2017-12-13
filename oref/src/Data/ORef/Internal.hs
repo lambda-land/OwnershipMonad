@@ -16,8 +16,8 @@ module Data.ORef.Internal
   -- , writeFlag
   -- , setEntryReadFlag
   , setEntryWriteFlag
-  , checkEntryReadFlagThread
-  , checkEntryWriteFlagThread
+  , checkEntryReadFlag
+  , checkEntryWriteFlag
   -- , checkEntry
   , checkORef
   -- , checkThreadId
@@ -122,17 +122,15 @@ setEntryReadFlag b (Entry _ w bc t a) = (Entry b w bc t a)
 setEntryWriteFlag :: Bool -> Entry -> Entry
 setEntryWriteFlag b (Entry r _ bc t a) = (Entry r b bc t a)
 
--- TODO check borrowers?
 -- | Check if an Entry can be read and if it is in the same thread
-checkEntryReadFlagThread :: Entry -> IO Bool
-checkEntryReadFlagThread (Entry r _w bc thrId _) = do
+checkEntryReadFlag :: Entry -> IO Bool
+checkEntryReadFlag (Entry r _w _bc thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && r
 
--- TODO check borrowers?
 -- | Check if an Entry can be written to and if it is in the same thread
-checkEntryWriteFlagThread :: Entry -> IO Bool
-checkEntryWriteFlagThread (Entry _r w bc thrId _) = do
+checkEntryWriteFlag :: Entry -> IO Bool
+checkEntryWriteFlag (Entry _r w _bc thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && w
 

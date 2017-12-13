@@ -159,9 +159,23 @@ important when discussing Owned Channels between separate threads later on.
 \section{The Ownership System}
 
 Resources are bound to a variable once they are created inside the ownership
-monad.  These variables are the mechanism to access - or refer - to the
+monad.  These variables are the mechanism to access - or refer to - the
 underlying resource.  In the library these variables are called ORef's -
 or \textit{Owned References}.
+
+When the operations inside that monad are complete - the references
+will no longer exist and the resources will be marked as free.
+% TODO this is actually quite significant and worth explaining more because it
+% allows us to determine when a resource no longer needs to exist.
+% (can be automatically destroy and freed)
+% Explain that ORef's are dropped once the monad is finished evaluating - and we
+% know they can be dropped then.
+The information inside of the resource which is bound to the owned reference can
+only be accessed by the provided operations for references within the ownership
+monad.
+
+These operations which act on owned references will verify whether the ownership
+rules are being followed and prevent violations.
 
 \subsection{Reference Creation}
 
@@ -186,36 +200,24 @@ the value and state of the owned reference.
 Performing \texttt{get} will return the ID to use next as well as the current
 mapping of owned reference ID's and their entries.
 
-In order to prevent the child threads from using the owned references that
+The thread ID of the thread that created the owned reference must
+be stored in order to prevent child threads from using the owned references that
 were potentially inherited through the namespacing scope of their parent
-threads - the thread ID of the thread that created the owned reference must
-be stored.
-This is set when the owned reference is initially created and requires
+threads.  This is set when the owned reference is initially created and requires
 an \texttt{IO} operation to get the current thread ID of the thread
 creating the new \texttt{ORef}.
 
 The entry that will be inserted into the new mapping will have its read and
-write flags initially set to true and its borrower count initialized to zero.
+write flags initially set to true and its borrower count initialized as zero.
 It will also consist of the thread ID of its creator and the value to store.
+The new store of entries as well as the incremented ID are put back into the
+state.
 
-
-When the operations inside that monad are complete - the references
-will no longer exist and the resources will be marked as free.
-% TODO this is actually quite significant and worth explaining more because it
-% allows us to determine when a resource no longer needs to exist.
-% (can be automatically destroy and freed)
-% Explain that ORef's are dropped once the monad is finished evaluating - and we
-% know they can be dropped then.
-The information inside of the resource which is bound to the owned reference can
-only be accessed by the provided operations for references within the ownership
-monad.
-
-These operations which act on owned references will verify whether the ownership
-rules are being followed and prevent violations.
-
-Resources that are put into references can only have one owner at any given
-time. The reference bound to the newly initialized resource becomes the sole
-owner of that resource. 
+The final operation is to return the new \textit{ORef} so that it can be used by other
+ownership operations.
+% Resources that are put into references can only have one owner at any given
+% time. The reference bound to the newly initialized resource becomes the sole
+% owner of that resource. 
 The type of an \texttt{ORef} is a thin wrapper around a way to tag and identify
 resources.
 
@@ -231,14 +233,53 @@ monad to use as it enforces ownership typing rules and tracks each resource.
 \subsection{Copying a Reference}
 
 The underlying resource owned by a reference may be copied by other references
-within the scope of that ownership monad.  When this occurs the new references is
-created and is then given ownership over their copy of the resource.  After a
-copy operation is performed the two references will each own what are now,
+within the scope of the same ownership monad.  When this occurs a new
+references is created and is then given ownership over a copy of the resource.
+After a copy operation is performed the two references will each own what are now,
 essentially, two separate and different resources.
 
 \begin{verbatim}
 copyORef :: ORef a -> Own (ORef a)
+copyORef oref = do
+    (new, store) <- get
+    entry <- getEntry oref
+    ok <- liftIO $ checkEntryReadFlag entry
+    case ok of
+      False -> lift $ left "Error during copy operation"
+      True -> do
+        let newEntry = setEntryWriteFlag True entry
+        put (new + 1, insert new entry store)
+        return (ORef new)
 \end{verbatim}
+
+The \texttt{copyORef} operation checks for an ownership system violation when
+it is run.  A copy can be made if the underlying owned reference is readable
+and if it is the same thread as the copy operation.
+The thread ID check needs to be lifted from the \texttt{IO} monad.
+The \texttt{ORef} entry contains the flags which indicate whether an owned
+reference can be written to, read from, and how many borrower it has.
+
+The owned reference needs to be readable for a copy operation to occur.
+A copy operation can occur even if the owned reference is not writable.
+The write flag would be false if there were multiple immutable borrowers. If
+there was a single mutable borrower than the read flag would also be false.
+
+When an owned reference is writable this indicates that no other functions
+are currently using the resource in a way that may mutate the value stored
+in the owned reference.
+This will be discussed further with regards to mutable borrows in a later
+section.
+
+A readable owned reference signals that there may be other functions using the
+resource but they are doing so in an immutable manner. The owned reference can
+be read and copied when it has multiple borrowers as long as those borrowers are
+immutable.
+
+The \texttt{checkEntryReadFlag} function will return true if the owned reference is
+readble and in the same thread.
+If the copy operation is able to occur the new owned reference is inserted into
+the store for that monad. The new owned reference is set as writable even if
+the reference it was copied from was not. % TODO
 
 For those familiar with the terminology from the Rust programming language, the
 term \textit{copy} here is not the same as a copy in Rust. Rust makes a special

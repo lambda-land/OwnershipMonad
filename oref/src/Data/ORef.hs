@@ -68,7 +68,7 @@ copyORef :: ORef a -> Own (ORef a)
 copyORef oref = do
     (new, store) <- get
     entry <- getEntry oref
-    ok <- liftIO $ checkEntryReadFlagThread entry -- TODO check borrower count here too?
+    ok <- liftIO $ checkEntryReadFlag entry
     case ok of
       False -> lift $ left "Error during copy operation"
       True -> do
@@ -144,7 +144,7 @@ moveORef' oORef nORef = do
 borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
 borrowORef oref k = do
     e <- getEntry oref
-    ok <- liftIO $ checkEntryReadFlagThread e
+    ok <- liftIO $ checkEntryReadFlag e
     -- This will check if we can read the entry and if it is in our thread
     -- We do not intend to write to it so we do not need to check that
     case ok of
