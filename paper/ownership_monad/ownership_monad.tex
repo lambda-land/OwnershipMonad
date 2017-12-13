@@ -42,11 +42,11 @@ at the onset seem unnecessary since in a pure language, by definition, % TODO Ad
 the data making up the resources bound to variables is immutable. Because of
 this there is no inherent state.  Haskell's purity therefore allows for referential
 transparency where values and variables can be thought of as being
-interchangeable in the sense that under any context evaluating an expression will
+interchangeable - in the sense that under any context evaluating an expression will
 always lead to the same result. % TODO change this sentence
+
 Referential transparency is a very desirable property which allows for a greater
 ability to reason about the behavior and correctness of a program.
-
 Unfortunately even in a pure language like Haskell, this property breaks down in
 the context of concurrency.  In order to allow separate threads to communicate
 the basic mechanisms provided by Concurrent Haskell introduce mutable state.
@@ -61,12 +61,10 @@ result from mutable state \cite{Wadler90lineartypes} and concurrency
 \cite{caires2010session}.  Language level support for linear types has been
 proposed for the Glasgow Haskell Compiler. \cite{LinearTypesGHC}
 % This would add plain linear types, directly inspired from linear logic.
-Ways to add Linear types to Haskell without language level support have also
+Ways to add linear types to Haskell without language level support have also
 been demonstrated using embedded domain specific languages within a monadic
 context. \cite{Paykin:2017:LM:3122955.3122965}
 
-The issue that these solutions often have to contend with is that linear types
-can become cumbersome to work with.
 Other less restrictive forms logic have been used in type systems for similar
 resource tracking.
 Affine type systems weaken the restrictions imposed by linear type systems.
@@ -138,7 +136,6 @@ Uniqueness types in Idris, ownership typing in Rust, and the ownership system
 make use of the idea that by tracking resource use and applying rules to how
 resources are used - certain properties can be enforced.
 % TODO briefly what these are here
-
 The type of the ownership monad:
 
 % Ownership Monad with IO in the transformers stack
@@ -253,7 +250,7 @@ copyORef oref = do
 
 The \texttt{copyORef} operation checks for an ownership system violation when
 it is run.  A copy can be made if the underlying owned reference is readable
-and if it is the same thread as the copy operation.
+is in the same thread as the copy operation.
 The thread ID check needs to be lifted from the \texttt{IO} monad.
 The \texttt{ORef} entry contains the flags which indicate whether an owned
 reference can be written to, read from, and how many borrower it has.
@@ -275,7 +272,7 @@ be read and copied when it has multiple borrowers as long as those borrowers are
 immutable.
 
 The \texttt{checkEntryReadFlag} function will return true if the owned reference is
-readble and in the same thread.
+readable and in the same thread.
 If the copy operation is able to occur the new owned reference is inserted into
 the store for that monad. The new owned reference is set as writable even if
 the reference it was copied from was not. % TODO
