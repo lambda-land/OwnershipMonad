@@ -31,7 +31,7 @@ introduces a set of rules that govern how, when, and by whom a resource within
 what is called an \textit{Owned Reference} (an \texttt{ORef}) can be used.
 
 While the restrictions this implementation imposes may seem to increase the
-complexity of writing programs, the resulting guaranties over resource usage
+complexity of writing programs, the resulting guarantees over resource usage
 that adhering to these rules facilitates offer improvements in specific areas.
 Furthermore applying this system provides an example for how monadic based
 systems - with fewer restrictions than linear types - can offer many of the same
@@ -256,20 +256,19 @@ The \texttt{ORef} entry contains the flags which indicate whether an owned
 reference can be written to, read from, and how many borrower it has.
 
 The owned reference needs to be readable for a copy operation to occur.
+If an owned reference if readable that signals that there may be other functions
+using the resource but they are doing so in an immutable manner. The owned
+reference can be read and copied when it has multiple borrowers as long as
+those borrowers are all immutable.
+
 A copy operation can occur even if the owned reference is not writable.
 The write flag would be false if there were multiple immutable borrowers. If
 there was a single mutable borrower than the read flag would also be false.
-
 When an owned reference is writable this indicates that no other functions
 are currently using the resource in a way that may mutate the value stored
 in the owned reference.
 This will be discussed further with regards to mutable borrows in a later
 section.
-
-A readable owned reference signals that there may be other functions using the
-resource but they are doing so in an immutable manner. The owned reference can
-be read and copied when it has multiple borrowers as long as those borrowers are
-immutable.
 
 The \texttt{checkEntryReadFlag} function will return true if the owned reference is
 readable and in the same thread.
@@ -301,14 +300,45 @@ operation removes the old reference from the scope of the ownership monad it
 previously existed in and the new reference is now the sole owner of the
 resource.
 
-The library function for moving resources from one \texttt{ORef} to another has
-the following type:
-
 \begin{verbatim}
 moveORef :: ORef a -> Own (ORef a)
+moveORef oldORef = do
+    ok <- checkORef oldORef
+    case ok of
+      False -> lift $ left "Error during move from an oref to a new oref\
+                           \ check entry failed for the exisiting (old) oref."
+      True -> do
+        new <- copyORef oldORef
+        dropORef oldORef
+        return new
 \end{verbatim}
 
-Move operations provide a way for a references to interact with
+The implementation of \texttt{moveORef} verifies that the old ORef is readable,
+writable, and does not have any borrowers. The old ORef also must exist
+within the same thread as the ownership monad in which the operations are being
+performed in.
+
+The ownership system needs to enforce that the old ORef is readable in order
+for this operation to occur because this indicates that the resource has not
+been dropped and is still valid to use in this context.
+The ORef must also be writable in order to ensure that another function
+is not currently borrowing the resource in a mutable way.
+Checking whether the ORef is readable and writable does not provide a
+sufficient enough amount of information to determine if the resource
+has any immutable borrowers. For that reason the ORef's borrower count is
+checked and the operation will fail if the ORef has one or more borrowers.
+% TODO mention equivalent of dangling points - referring to something
+% through a referent that no longer exists.
+
+If the old ORef is valid and can be used in the operation a copy of it is made
+with the copyORef function. After the copy is complete the old ORef is dropped
+using the dropORef function. This removes the old ORef from that monad and
+prevents other operations from referring to the resource through the old ORef.
+In this implementation the old ORef and its entry remain in the map but
+it would be safe at this point to garbage collect or free the resource space
+inside the entry corresponding to the old ORef.
+
+Move operations provide a way for a reference to interact with
 other references and provide a building block for larger more complex
 abstractions that will be discussed later on.
 
@@ -319,13 +349,66 @@ A moved resource by comparison doesn't change - instead what is altered is the
 record of who owns that resource.  Neither operation, moving and copying,
 creates a situation where more than one reference owns a resource.
 
+\subsection{Dropping an Owned Reference}
+
+The \textit{drop} operation will explicitly remove an owned reference from the
+ownership monad it previously existed in.
+This will destroy the resource from the point of view of the other operations
+in that ownership context.
+
+\begin{verbatim}
+dropORef :: ORef a -> Own ()
+dropORef oref = do
+    ok <- checkORef oref
+    case ok of
+      False -> lift $ left "Error during drop operation -\
+                           \ make sure old ORef is writable and doesn't have\
+                           \ borrowers."
+      True -> do
+        setWriteFlag oref False
+        setReadFlag oref False
+\end{verbatim}
+
+Any further operations that try to use the dropped reference will be prevented
+from occurring.
+In order for an owned reference to be dropped it must not have any borrowers.
+The reference must also be in the same thread as the drop operation and
+the owned reference must be readable and writable. If the ownership system rules
+are not being violated then the ORef will be marked as not readable or writable.
+The resource space inside the entry of a dropped reference can be freed since
+it will no longer be used.
+
+\subsection{Writing to a Resource}
+
+A resource can be changed by its owner as long as it does not have any borrowers.
+The value within the resource can be updated and changed through the reference
+that owns the resource. This operation can be performed safely because the usage
+of the underlying resource is tracked by the ownership monad.
+
+\begin{verbatim}
+writeORef :: Typeable a => ORef a -> a -> Own ()
+writeORef oref a = do
+    ok <- checkORef oref
+    case ok of
+      False -> lift $ left "Error during write operation - checking if the entry\
+                           \ could be written to or if it was in the same thread\
+                           \ returned False."
+      True -> setValue oref a
+\end{verbatim}
+
+The reference that is being changed cannot have any borrowers and it must
+be in the same thread as the write operation.
+When the operation is performed the existing resource inside the ORef is over
+written by the new value.
+
+
 \subsection{Immutably Borrowing a Resource}
 
-Borrowing a resource is the operation that allows a function to have
-access to be able to use the contents of an owned reference.
+Borrowing a resource is the operation that allows a function to be able to use
+the contents of an owned reference.
 A resource can be used within the confines of the ownership monad by its owner
-and a function that will be required to return the resource to the context of
-the ownership monad.
+and a function. This function will be required to return the resource to the
+context of the original ownership monad.
 
 This operation is similar to passing a value to a function as an immutable
 borrow in the Rust language.  To give some background on what this means:
@@ -356,37 +439,62 @@ This library takes a slightly different approach: instead of letting variables
 borrow a resource, a borrow operation instead lends the resource to a function
 which temporarily borrows the resource in order to use it.
 
+\begin{verbatim}
+borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
+borrowORef oref k = do
+    entry <- getEntry oref
+    ok <- liftIO $ checkEntryReadFlag entry
+    case ok of
+      False -> lift $ left "Error during borrow operation - this occured while\
+                           \ checking if the entry was in in the same thread\
+                           \ or if it could be read returned false."
+      True -> do
+        setWriteFlag oref False
+        incBC oref
+        b <- k (value entry)
+        decBC oref
+        otherBorrowers <- hasOtherBorrowers oref
+        if otherBorrowers
+            then do
+                return b
+            else do
+                setWriteFlag oref True
+                return b
+\end{verbatim}
+
+A borrow operation can occur if the owned reference is readable and in
+the same thread as the operation.
 While the resource is being borrowed it is prevented from being written to.
 The function that borrows the resource is of type \texttt{(a -> Own b)}. The
 resource being consumed in the function remains inside of the context of the
 ownership monad while the function executes.
 
-\begin{verbatim}
-borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
-\end{verbatim}
-
 Much like the Rust language will not allow for a mutable resource to be lent to
-multiple borrowers - neither will the borrow operation on a \texttt{ORef}.
-The \texttt{ORef} will ensure that the resource is not mutated or written to while is it
-lent out to the borrowing function. 
+multiple borrowers - neither will the borrow operation on an \texttt{ORef}.
+This will ensure that the resource is not mutated or written to while is it lent
+out to the borrowing function.
 Because each borrow operation occurs within the context of the ownership monad
 the resource usage can be tracked and this property can be ensured. The
 reference that owns the resource will track the resource while the function
 executes.
 
-The borrow operation also ensures that the original \texttt{ORef} is not able to go away
-before the function borrowing it is complete - this will make sure that the
-function is not referring to an \texttt{ORef} that no longer exists.  The \texttt{ORef} that is
-being borrowed by the function is not able to be moved (or otherwise dropped)
-before the function that the resource has been lent to is complete. This is
-enforced by the move and drop which individually check that
-a \texttt{ORef} does not have any borrowers before they operate on the \texttt{ORef}.
+The borrow operation also ensures that the original \texttt{ORef} is not able to
+go away before the function borrowing it is complete - this will make sure that
+the function is not referring to an \texttt{ORef} that no longer exists.
+The \texttt{ORef} that is being borrowed by the function is not able to be moved
+(or otherwise dropped) before the function that the resource has been lent to is
+complete. This is enforced by the move and drop operations which individually
+check that a \texttt{ORef} does not have any borrowers before they operate on
+the \texttt{ORef}.
 
 This library also allows multiple functions to simultaneously perform
-\textit{borrow} operations on an existing \texttt{ORef}. This is equivalent to a variable
-being borrowed by more than one immutable borrower in Rust. To do this a
-borrower count is maintained by each \texttt{ORef} and the writable flag is not
-reset until this count is zero.
+\textit{borrow} operations on an existing \texttt{ORef}. This is equivalent to
+a variable being borrowed by more than one immutable borrower in Rust. To do
+this a borrower count is maintained by each \texttt{ORef}.
+If the borrow operation is able to proceed it increments the borrower count
+and decrements the count when and if the borrowing function finishes execution.
+The writable flag is not reset to true by the borrow operation until the
+borrower count is zero.
 
 In this library the borrow operation can only read the value and will not allow
 the resource to be mutated by the function.  In order to be able to borrow and
@@ -395,58 +503,48 @@ mutate the reference a different operation is required.
 \subsection{Mutably Borrowing a Resource}
 
 This library also allows a function borrowing a resource to be able to
-write to (or mutate) the resource in the original \texttt{ORef}.  In Rust this would be
-equivalent to having a single mutable borrower.  The \textit{mutable borrow}
-operation in this library permits the function borrowing that resource to read
-and set the value in the original \texttt{ORef}.
+write to (or mutate) the resource in the original \texttt{ORef}.  In Rust this
+would be equivalent to having a single mutable borrower.
+The \textit{mutable borrow} operation in this library permits the function
+borrowing that resource to read and set the value in the original \texttt{ORef}.
 
 \begin{verbatim}
 mutableBorrowORef :: Typeable a => ORef a -> (a -> Own a) -> Own ()
+mutableBorrowORef oref k = do
+    ok <- checkORef oref
+    case ok of
+      False -> lift $ left "Error during mutable operation - checking if the\
+                           \ entry was in in the same thread or if it could be\
+                           \ read and written to returned false."
+      True -> do
+        setWriteFlag oref False
+        setReadFlag oref False
+        incBC oref
+        v <- getValue oref
+        b <- k v
+        setValue oref b
+        decBC oref
+        setWriteFlag oref True
+        setReadFlag oref True
 \end{verbatim}
 
 To allow a mutable borrow it is necessary to know if other functions are
-borrowing the resource.  Each \texttt{ORef} tracks if it has borrowers by keeping a
-ledger indicating if it is able to be read from or written to and how many
-living borrowers it has.  When a resource has one or more immutable borrowers it
-is no longer able to be written to - but it can still be read from.
-The reason why \texttt{ORef}'s have two flags - one for read and one for write - is that
-if a resource can be both read from and written to then we know it doesn't have
-any borrowers; if it cannot be read from or written to we know it was either
-dropped or it currently already has a mutable borrower.
-In order to allow one borrower to be able to mutate the resource it is required
-that it is the only borrower of the resource at that time. % TODO rework
-A mutable borrow is prevented from happening is the \texttt{ORef} is not writable.
+borrowing the resource. A mutable borrow can only occur if the reference
+is readable, writable and without other borrowers.
+Each \texttt{ORef} already tracks if it is able to be read from or written to.
+The borrower count also shows if the reference has any borrowers that are
+still alive in that monadic context.
 
-% TODO Mention the Idris approach of borrows
+When a resource has one or more immutable borrowers it is no longer able to be
+written to even though it can still be read from.  For that reason to allow for
+a borrower to have mutable access to the reference it needs to be the sole
+borrower. If a resource can be both read from and written to then we know it
+doesn't have any borrowers. \footnote{ The borrow count is needed for allowing
+  multiple borrowers in order to know when the last borrower has finished and
+  the reference can be set as writable. }
 
-\subsection{Writing to a Resource}
+% TODO explain why a mutableBorrowORef is not the same as a writeORef
 
-A resource can be changed by its owner as long as it does not have any borrowers.
-The value within the resource can be updated and changed through the reference
-that owns the resource. This operation can be performed safely because the usage
-of the underlying resource is tracked by the ownership monad.
-
-\begin{verbatim}
-writeORef :: Typeable a => ORef a -> a -> Own ()
-\end{verbatim}
-
-The existing resource in side the ORef is over written by the new value.
-
-\subsection{Dropping an Owned Reference}
-
-The \textit{drop} operation will explicitely remove an owned reference from the
-ownership monad it previously existed in.
-This will destroy the resource from the point of view of that ownership context.
-
-\begin{verbatim}
-dropORef :: ORef a -> Own ()
-\end{verbatim}
-
-Any further operations will be prevented from occurring using the dropped
-reference. In order to be dropped: a resource must not have any borrowers,
-it must exist in that context,
-and it must be readable and writable.
-Otherwise the drop operation will not be permitted.
 
 \section{Move Semantics}
 
@@ -460,6 +558,8 @@ TODO
 \section{ORef's}
 
 TODO ORef's example section
+
+
 
 
 \chapter{Owned Channels}

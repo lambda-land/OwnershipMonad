@@ -52,13 +52,12 @@ dropORef :: ORef a -> Own ()
 dropORef oref = do
     ok <- checkORef oref  -- Check Read and Write
     case ok of
-      False -> lift $ left "Error during drop operation - \
-                           \make sure old ORef is writable and doesn't have\
+      False -> lift $ left "Error during drop operation -\
+                           \ make sure old ORef is writable and doesn't have\
                            \ borrowers."
       True -> do
         setWriteFlag oref False
         setReadFlag oref False
-        return ()
 
 -- | Copy the contents of one ORef to another.
 --
@@ -88,7 +87,7 @@ moveORef oldORef = do
     ok <- checkORef oldORef
     -- make sure old ORef is readable and writable and doesn't have borrowers
     case ok of
-      False -> lift $ left "Error during move from an oref to a new oref \
+      False -> lift $ left "Error during move from an oref to a new oref\
                            \ check entry failed for the exisiting (old) oref."
       True -> do
         new <- copyORef oldORef
@@ -105,8 +104,8 @@ moveORef' oORef nORef = do
     ok <- checkORef oORef
     -- makes sure old ORef is readable and writable and doesn't have borrowers
     case ok of
-      False -> lift $ left "Error during move from oref to an existing oref - \
-                           \check entry failed for old oref."
+      False -> lift $ left "Error during move from oref to an existing oref -\
+                           \ check entry failed for old oref."
       True -> do
         oldORefValue <- getValue oORef
         dropORef oORef
@@ -114,11 +113,9 @@ moveORef' oORef nORef = do
         newORefOK <- checkORef nORef
         -- make sure the new ORef is writable/doesn't have borrowers
         case newORefOK of
-          False -> lift $ left "Error during move from oref to an existing oref - \
-                               \check entty failed for new oref."
-          True -> do
-            setValue nORef oldORefValue
-            return ()
+          False -> lift $ left "Error during move from oref to an existing oref -\
+                               \ check entty failed for new oref."
+          True -> setValue nORef oldORefValue
 
 -- | Borrow an ORef and use it in the given continuation.
 --
@@ -143,8 +140,8 @@ moveORef' oORef nORef = do
 --
 borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
 borrowORef oref k = do
-    e <- getEntry oref
-    ok <- liftIO $ checkEntryReadFlag e
+    entry <- getEntry oref
+    ok <- liftIO $ checkEntryReadFlag entry
     -- This will check if we can read the entry and if it is in our thread
     -- We do not intend to write to it so we do not need to check that
     case ok of
@@ -154,7 +151,7 @@ borrowORef oref k = do
       True -> do
         setWriteFlag oref False  -- set the oref write flag to false since it is being borrowed
         incBC oref -- add a borrower
-        b <- k (value e) -- use the value in the oref
+        b <- k (value entry) -- use the value in the oref
         decBC oref -- remove a borrower
         otherBorrowers <- hasOtherBorrowers oref
         if otherBorrowers
@@ -178,8 +175,8 @@ mutableBorrowORef :: Typeable a => ORef a -> (a -> Own a) -> Own ()
 mutableBorrowORef oref k = do
     ok <- checkORef oref -- check if the ORef can be read and written to
     case ok of
-      False -> lift $ left "Error during mutable operation - checking if the \
-                           \ entry was in in the same thread or if it could be \
+      False -> lift $ left "Error during mutable operation - checking if the\
+                           \ entry was in in the same thread or if it could be\
                            \ read and written to returned false."
       True -> do
         setWriteFlag oref False
@@ -187,11 +184,10 @@ mutableBorrowORef oref k = do
         incBC oref -- add a borrower
         v <- getValue oref
         b <- k v -- use the value in the oref
-        decBC oref -- remove a borrower
         setValue oref b -- update the ORef
+        decBC oref -- remove a borrower
         setWriteFlag oref True
         setReadFlag oref True
-        return ()
 
 -- | Write to an ORef or fail if it is not writable.
 writeORef :: Typeable a => ORef a -> a -> Own ()

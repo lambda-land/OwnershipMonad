@@ -68,7 +68,8 @@ type BorrowerCount = Int
 -- the number of borrowers
 -- the threadID of the owner,
 -- and a value of arbitrary type.
-data Entry = forall v. Typeable v => Entry Readable Writeable BorrowerCount ThreadId v
+data Entry =
+  forall v. Typeable v => Entry Readable Writeable BorrowerCount ThreadId v
 
 
 -- | Get the borrower count for an Entry
