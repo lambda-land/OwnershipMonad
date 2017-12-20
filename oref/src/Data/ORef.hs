@@ -39,7 +39,7 @@ newORef :: Typeable a => a -> Own (ORef a)
 newORef a = do
     (new,store) <- get
     thrId <- liftIO $ myThreadId
-    let entry = (Entry True True 0 thrId a)
+    let entry = (Entry True True thrId a)
     put (new + 1, insert new entry store)
     return (ORef new)
 
@@ -140,28 +140,20 @@ moveORef' oORef nORef = do
 --
 borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
 borrowORef oref k = do
-    entry <- getEntry oref
-    ok <- liftIO $ checkEntryReadFlag entry
+    ok <- checkORef oref
     -- This will check if we can read the entry and if it is in our thread
-    -- We do not intend to write to it so we do not need to check that
     case ok of
       False -> lift $ left "Error during borrow operation - this occured while\
                            \ checking if the entry was in in the same thread\
                            \ or if it could be read returned false."
       True -> do
         setWriteFlag oref False  -- set the oref write flag to false since it is being borrowed
-        incBC oref -- add a borrower
-        b <- k (value entry) -- use the value in the oref
-        decBC oref -- remove a borrower
-        otherBorrowers <- hasOtherBorrowers oref
-        if otherBorrowers
-            then do
-                return b
-            else do -- we are the last borrower
-                setWriteFlag oref True
-                -- set the oref write to true since it is not longer being
-                -- borrowed (and can be written to.)
-                return b  -- return the result of using the function on ORef a
+        setReadFlag oref False
+        v <- getValue oref
+        b <- k v -- use the value in the oref
+        setReadFlag oref True
+        setWriteFlag oref True
+        return b
 
 -- | Borrow an ORef in a mutable way.
 --
@@ -181,11 +173,9 @@ mutableBorrowORef oref k = do
       True -> do
         setWriteFlag oref False
         setReadFlag oref False
-        incBC oref -- add a borrower
         v <- getValue oref
         b <- k v -- use the value in the oref
         setValue oref b -- update the ORef
-        decBC oref -- remove a borrower
         setWriteFlag oref True
         setReadFlag oref True
 

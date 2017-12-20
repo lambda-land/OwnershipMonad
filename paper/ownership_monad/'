@@ -56,6 +56,10 @@ Under these circumstances, Haskell's usual approach of segregating side-effects
 into monadic computations does not resolve every issue that can exist with
 shared-state concurrency.
 
+Immutable data structures simplify concurrency and are preferable to
+mutable structures. However categories of problems still exist where a
+mutable structure is required.
+
 For example a race condition can be created when a mutable reference is shared
 across a channel between two threads:
 
@@ -88,10 +92,6 @@ to the same \texttt{IORef} and it could be unclear which will access the
 resource first. Under these conditions the issue is not only that we have
 shared mutable state but that we have shared access to that state.
 
-Immutable data structures simplify concurrency and are preferable to
-mutable structures. However categories of problems still exist where a
-mutable structure is required.
-
 Linear types are often suggested as a possible solution to limit the issues that
 result from mutable state \cite{Wadler90lineartypes} and concurrency
 \cite{caires2010session}.  Language level support for linear types has been
@@ -117,7 +117,7 @@ This is combined with the approach of defining embedded languages in monadic
 programming to allow for dynamic ownership checking without language level
 support for affine types in Haskell.
 % This project will demonstrate that the existing model
-% for embedded languages in monadic programming extends to affine types.
+for embedded languages in monadic programming extends to affine types.
 
 Concurrent Haskell programs can still fall prey to some of the same fundamental
 problems that other impure languages can, namely deadlock and starvation.
@@ -155,7 +155,7 @@ with a set of rules similar to affine types.
 The term \textit{Ownership System} is used to describe the system for how
 resources are tracked and how they can be used once they are created. This
 system operates within the context of the ownership monad.
-The ownership system this library implements is inspired by
+The ownership system this library implements are inspired by
 ownership typing in Rust as well as Uniqueness Types
 from Idris.\cite{rust_book_ownership} \cite{idris_uniqueness_types}
 % Restricting all entities to following the rules specified under an
@@ -169,8 +169,10 @@ cases.
 Uniqueness types in Idris, ownership typing in Rust, and the ownership system
 make use of the idea that by tracking resource use and applying rules to how
 resources are used - certain properties can be enforced.
-% TODO Such as? Briefly what these are here
+% TODO briefly what these are here
 The type of the ownership monad:
+
+% Ownership Monad with IO in the transformers stack
 
 \begin{verbatim}
 type Own a = StateT (ID,Store) (EitherT String IO) a
@@ -188,13 +190,17 @@ reference \texttt{ID} to an \texttt{Entry}.
 
 \begin{verbatim}
 data Entry = 
-  forall v. Typeable v => Entry Readable Writeable ThreadId v
+  forall v. Typeable v => Entry Readable Writeable BorrowerCount ThreadId v
 \end{verbatim}
 
 Each owned reference \texttt{Entry} stores a Boolean flag to indicate whether
-that reference is readable and if it is writable.
-In addition to the resource stored in the reference the threadID of the owned
-reference is also stored.
+that reference is readable and if it is writable.  The \texttt{Entry} also
+keeps a borrower count.  This is a simple count of how many borrowers for that
+reference are still alive in that monadic context.  This number increases
+or decreases as borrowers are created or finish executing.  In addition
+to the resource stored in the reference the threadID of the owned reference is
+also stored.
+
 
 \section{The Ownership System}
 
@@ -218,8 +224,8 @@ These operations which act on owned references will verify whether the ownership
 rules are being followed and prevent violations. There are operations to create
 owned references, copy them, move the resource from one reference to another,
 drop a reference from the scope, and write a value to a reference. There are
-also operations for borrowing the resource inside a reference. This allows
-for a function to temporarily use the resource without taking ownership over it.
+also operations for borrowing the resource inside a reference temporarily
+without taking ownership of the resource.
 
 \subsection{Reference Creation}
 
@@ -232,7 +238,7 @@ newORef :: Typeable a => a -> Own (ORef a)
 newORef a = do
     (new,store) <- get
     thrId <- liftIO $ myThreadId
-    let entry = (Entry True True thrId a)
+    let entry = (Entry True True 0 thrId a)
     put (new + 1, insert new entry store)
     return (ORef new)
 \end{verbatim}
@@ -246,16 +252,18 @@ mapping of owned reference ID's and their entries.
 
 The thread ID of the thread that created the owned reference must
 be stored in order to prevent child threads from using the owned references that
-were potentially inherited through the name-spacing scope of their parent
+were potentially inherited through the namespacing scope of their parent
 threads.  This is set when the owned reference is initially created and requires
 an \texttt{IO} operation to get the current thread ID of the thread
 creating the new \texttt{ORef}.
 
 The entry that will be inserted into the new mapping will have its read and
-write flags initially set to true.
+write flags initially set to true and its borrower count initialized as zero.
+It will also consist of the thread ID of its creator and the value to store.
 The new store of entries as well as the incremented ID are put back into the
 state.
-The final step is to return the new \textit{ORef} so that it can be used by other
+
+The final operation is to return the new \textit{ORef} so that it can be used by other
 ownership operations.
 % Resources that are put into references can only have one owner at any given
 % time. The reference bound to the newly initialized resource becomes the sole
@@ -276,7 +284,7 @@ monad to use as it enforces ownership typing rules and tracks each resource.
 
 The underlying resource owned by a reference may be copied by other references
 within the scope of the same ownership monad.  When this occurs a new
-reference is created and is then given ownership over a copy of the resource.
+references is created and is then given ownership over a copy of the resource.
 After a copy operation is performed the two references will each own what are now,
 essentially, two separate and different resources.
 
@@ -296,25 +304,31 @@ copyORef oref = do
 
 The \texttt{copyORef} operation checks for an ownership system violation when
 it is run.  A copy can be made if the underlying owned reference is readable
-and is in the same thread as the copy operation.
+is in the same thread as the copy operation.
 The thread ID check needs to be lifted from the \texttt{IO} monad.
+The \texttt{ORef} entry contains the flags which indicate whether an owned
+reference can be written to, read from, and how many borrower it has.
 
 The owned reference needs to be readable for a copy operation to occur.
-When an owned reference is readable that signals that there may be other
-operations using the resource but doing so in a way that is immutable.
+If an owned reference if readable that signals that there may be other functions
+using the resource but they are doing so in an immutable manner. The owned
+reference can be read and copied when it has multiple borrowers as long as
+those borrowers are all immutable.
 
-% A copy operation can occur even if the owned reference is not writable.
-% The write flag would be false if the reference was being borrower by a
-% function.
-When an owned reference is readable and writable this indicates that no function
-is currently using the resource in a borrow in a way that may mutate the value
-stored in the owned reference.
+A copy operation can occur even if the owned reference is not writable.
+The write flag would be false if there were multiple immutable borrowers. If
+there was a single mutable borrower than the read flag would also be false.
+When an owned reference is writable this indicates that no other functions
+are currently using the resource in a way that may mutate the value stored
+in the owned reference.
+This will be discussed further with regards to mutable borrows in a later
+section.
 
-The \texttt{checkEntryReadFlag} function will return true if the owned reference
-is readable and in the same thread.
+The \texttt{checkEntryReadFlag} function will return true if the owned reference is
+readable and in the same thread.
 If the copy operation is able to occur the new owned reference is inserted into
 the store for that monad. The new owned reference is set as writable even if
-the reference it was copied from was not.
+the reference it was copied from was not. % TODO
 
 For those familiar with the terminology from the Rust programming language, the
 term \textit{copy} here is not the same as a copy in Rust. Rust makes a special
@@ -355,14 +369,19 @@ moveORef oldORef = do
 \end{verbatim}
 
 The implementation of \texttt{moveORef} verifies that the old ORef is readable,
-and writable. The old ORef also must exist within the same thread as the
-ownership monad in which the operations are being performed in.
+writable, and does not have any borrowers. The old ORef also must exist
+within the same thread as the ownership monad in which the operations are being
+performed in.
 
 The ownership system needs to enforce that the old ORef is readable in order
 for this operation to occur because this indicates that the resource has not
 been dropped and is still valid to use in this context.
 The ORef must also be writable in order to ensure that another function
 is not currently borrowing the resource in a mutable way.
+Checking whether the ORef is readable and writable does not provide a
+sufficient enough amount of information to determine if the resource
+has any immutable borrowers. For that reason the ORef's borrower count is
+checked and the operation will fail if the ORef has one or more borrowers.
 % TODO mention equivalent of dangling points - referring to something
 % through a referent that no longer exists.
 
@@ -374,9 +393,9 @@ In this implementation the old ORef and its entry remain in the map but
 it would be safe at this point to garbage collect or free the resource space
 inside the entry corresponding to the old ORef.
 
-% Move operations provide a way for a reference to interact with
-% other references and provide a building block for larger more complex
-% abstractions that will be discussed later on.
+Move operations provide a way for a reference to interact with
+other references and provide a building block for larger more complex
+abstractions that will be discussed later on.
 
 There is a key difference between moving a resource from an existing reference
 and copying it to a new one.  Functionally a resource that is copied is cloned
@@ -410,7 +429,7 @@ Any further operations that try to use the dropped reference will be prevented
 from occurring.
 In order for an owned reference to be dropped it must not have any borrowers.
 The reference must also be in the same thread as the drop operation and
-the owned reference must be readable and writable.  If the ownership system rules
+the owned reference must be readable and writable. If the ownership system rules
 are not being violated then the ORef will be marked as not readable or writable.
 The resource space inside the entry of a dropped reference can be freed since
 it will no longer be used.
@@ -440,18 +459,16 @@ When the operation is performed the existing resource inside the ORef is over
 written by the new value.
 
 
-\subsection{Borrowing a Resource}
+\subsection{Immutably Borrowing a Resource}
 
 Borrowing a resource is the operation that allows a function to be able to use
 the contents of an owned reference.
 A resource can be used within the confines of the ownership monad by its owner
-and a function. This function will be required to return to the
+and a function. This function will be required to return the resource to the
 context of the original ownership monad.
 
-% TODO move to related works section
-This operation is similar to passing a value to a function as a mutable
-borrow in the Rust language.
-To give some background on what this means:
+This operation is similar to passing a value to a function as an immutable
+borrow in the Rust language.  To give some background on what this means:
 depending on the type signature a function in Rust will either copy the value
 it is passed, take ownership of the value, or it will borrow the value - in
 which case ownership of the value is automatically returned when the function
@@ -460,7 +477,7 @@ A function in Rust that takes a borrowed value as an argument is - in a way -
 syntactic sugar over that function first taking ownership of the value and then
 returning ownership over the value by placing it within the expression that is
 returned.
-Instead of having to do these steps explicitly a value can be passed to a
+Instead of having to do these steps explicitly - a value can be passed to a
 function as a borrowed value.  When a value is borrowed, the function will take
 a reference to that the value from the original owner and eventually the
 ownership of the resource will be handed back when the function returns.
@@ -472,7 +489,7 @@ borrowers as long as the borrowers never mutate the underlying resource - or we
 can lend it to a single borrower that will be able to mutate the
 resource.\cite{rust_book_borrowing}
 It should be clear why giving multiple variables mutable access to
-the same resource could create data races which is why mutable borrows to
+the same resource could create data races - which is why mutable borrows to
 multiple variables (or functions) are not allowed.
 
 This library takes a slightly different approach: instead of letting variables
@@ -482,29 +499,32 @@ which temporarily borrows the resource in order to use it.
 \begin{verbatim}
 borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
 borrowORef oref k = do
-    ok <- checkORef oref
+    entry <- getEntry oref
+    ok <- liftIO $ checkEntryReadFlag entry
     case ok of
-      False -> lift $
-                 left "Error during borrow operation - this occured while\
-                      \ checking if the entry was in in the same thread\
-                      \ or if it could be read returned false."
+      False -> lift $ left "Error during borrow operation - this occured while\
+                           \ checking if the entry was in in the same thread\
+                           \ or if it could be read returned false."
       True -> do
         setWriteFlag oref False
-        setReadFlag oref False
-        v <- getValue oref
-        b <- k v
-        setReadFlag oref True
-        setWriteFlag oref True
-        return b
+        incBC oref
+        b <- k (value entry)
+        decBC oref
+        otherBorrowers <- hasOtherBorrowers oref
+        if otherBorrowers
+            then do
+                return b
+            else do
+                setWriteFlag oref True
+                return b
 \end{verbatim}
 
-A borrow operation can occur if the owned reference is readable, writable, and
-in the same thread as the operation.
-While the resource is being borrowed it is prevented from being written to or
-read.
+A borrow operation can occur if the owned reference is readable and in
+the same thread as the operation.
+While the resource is being borrowed it is prevented from being written to.
 The function that borrows the resource is of type \texttt{(a -> Own b)}. The
 resource being consumed in the function remains inside of the context of the
-ownership monad while the function executes. % TODO explain why this matters
+ownership monad while the function executes.
 
 Much like the Rust language will not allow for a mutable resource to be lent to
 multiple borrowers - neither will the borrow operation on an \texttt{ORef}.
@@ -524,30 +544,62 @@ complete. This is enforced by the move and drop operations which individually
 check that a \texttt{ORef} does not have any borrowers before they operate on
 the \texttt{ORef}.
 
-This library does not allow multiple functions to simultaneously perform
-\textit{borrow} operations on an existing \texttt{ORef}. Doing
-so would prevent the contents of the \texttt{ORef} from being a mutable
-value like an \texttt{IORef}.  This restrictions means that the borrowing
-function is assumed to mutate the value in the reference but it is not
-required to do so.
-There is no equivalent to a variable being borrowed by more than one immutable
-borrower in Rust.
-This could be done by making multiple copies of an \texttt{ORef} and
-then giving these to individual borrowers.
+This library also allows multiple functions to simultaneously perform
+\textit{borrow} operations on an existing \texttt{ORef}. This is equivalent to
+a variable being borrowed by more than one immutable borrower in Rust. To do
+this a borrower count is maintained by each \texttt{ORef}.
+If the borrow operation is able to proceed it increments the borrower count
+and decrements the count when and if the borrowing function finishes execution.
+The writable flag is not reset to true by the borrow operation until the
+borrower count is zero.
 
-% In Rust this
-% would be equivalent to having a single mutable borrower.
-% The \textit{mutable borrow} operation in this library permits the function
-% borrowing that resource to read and set the value in the original \texttt{ORef}.
+In this library the borrow operation can only read the value and will not allow
+the resource to be mutated by the function.  In order to be able to borrow and
+mutate the reference a different operation is required.
+
+\subsection{Mutably Borrowing a Resource}
+
+This library also allows a function borrowing a resource to be able to
+write to (or mutate) the resource in the original \texttt{ORef}.  In Rust this
+would be equivalent to having a single mutable borrower.
+The \textit{mutable borrow} operation in this library permits the function
+borrowing that resource to read and set the value in the original \texttt{ORef}.
+
+\begin{verbatim}
+mutableBorrowORef :: Typeable a => ORef a -> (a -> Own a) -> Own ()
+mutableBorrowORef oref k = do
+    ok <- checkORef oref
+    case ok of
+      False -> lift $ 
+                 left "Error during mutable operation - checking if the\
+                      \ entry was in in the same thread or if it could be\
+                      \ read and written to returned false."
+      True -> do
+        setWriteFlag oref False
+        setReadFlag oref False
+        incBC oref
+        v <- getValue oref
+        b <- k v
+        setValue oref b
+        decBC oref
+        setWriteFlag oref True
+        setReadFlag oref True
+\end{verbatim}
 
 To allow a mutable borrow it is necessary to know if other functions are
 borrowing the resource. A mutable borrow can only occur if the reference
-is readable and writable.
+is readable, writable and without other borrowers.
 Each \texttt{ORef} already tracks if it is able to be read from or written to.
+The borrower count also shows if the reference has any borrowers that are
+still alive in that monadic context.
 
-To allow for a borrower to have mutable access to the reference it needs to be
-the sole borrower. If a resource can be both read from and written to then we
-know it doesn't have any borrowers.
+When a resource has one or more immutable borrowers it is no longer able to be
+written to even though it can still be read from.  For that reason to allow for
+a borrower to have mutable access to the reference it needs to be the sole
+borrower. If a resource can be both read from and written to then we know it
+doesn't have any borrowers. \footnote{ The borrow count is needed for allowing
+  multiple borrowers in order to know when the last borrower has finished and
+  the reference can be set as writable. }
 
 % TODO explain why a mutableBorrowORef is not the same as a writeORef
 
@@ -643,7 +695,7 @@ consumes the \texttt{ORef} and the thread loses the ability to further use the
 \texttt{ORef} in later operations.
 
 This operation can conceptually be thought of as the combination of two
-\texttt{ORef} operations - a borrow followed by a drop operation -
+\texttt{ORef} operations - an borrow followed by a drop operation -
 % TODO should we distinguish what kind of borrow?
 although these \texttt{ORef} operations are hidden from the user of the
 \texttt{OChan} library.
@@ -660,7 +712,7 @@ In order to write the resource inside the \texttt{ORef} to a traditional Channel
 Channel needs to borrow the resource.
 This might seem odd since it would appear that the borrower function does not
 intend to ever return the resource.  This is accurate, the resource that was
-written to the channel will not be returned; under the rules for a
+written to the channel will not be returned; under the rules for an immutable
 borrow this kind of use is actually allowed.  If it were not for the fact that
 the borrower function acts on resources shared between threads there would not be
 any issue.  Given the nature of concurrent operation between threads - doing
@@ -699,7 +751,7 @@ Haskell Channels. % TODO cite
 
 The second operation is to place the freshly acquired resource inside a new
 \texttt{ORef}.  This \texttt{ORef} will then be returned into the
-ownership monad context by the read operation on the
+owership monad context by the read operation on the
 owned channel.  The thread can now have access to the \texttt{ORef}
 and the value within it using the provided operations in the
 ownership monad.
@@ -721,71 +773,21 @@ with \texttt{liftIO}.
 
 \section{Detecting Race Conditions}
 
-In the original example in the introduction an undectable race condition was
-created by passing an IORef across a channel between two threads.
-Using \texttt{OChan} and \texttt{ORef} operations it is now possible
-to pass an \texttt{IOREf} between two channels and detect a situation
-that would result in a race condition before the race condition happens.
 
-This is an example of an operation that will succeed. Here we create an
-\texttt{IORef} and place it in an \texttt{ORef}. The parent thread
-then gives up ownership of the \texttt{ORef} when it writes it to the
-owned channel. The child thread can read the \texttt{ORef} from the
-\texttt{OChan} and claim ownership over its contents. The child thread
-can mutate the resource in a borrow operation and then write it back to
-the channel. 
+\section{Preventing Deadlock}
+% Describe/Define Deadlock
+TODO
 
-\begin{verbatim}
-mutableOChanTest :: Own ()
-mutableOChanTest = do
-  ch <- newOChan
+\subsection{Explicit Resource Ownership Prevents Deadlock}
+% How ownership prevents deadlock
+TODO
 
-  ioref <- liftIO $ do
-    r <- newIORef "hello"
-    return r
+\section{Beyond Threads}
 
-  ref <- newORef ioref
+TODO
 
-  writeOChan ch ref
-
-  _ <- liftIO $ forkIO $ do
-    ex <- startOwn $ do
-      oref <- readOChan ch
-      borrowORef
-        oref
-        (\x -> do
-            liftIO $ modifyIORef x ((++) " from the child thread")
-        )
-      writeOChan ch oref
-      return ()
-    return ()
-
-  oref' <- readOChan ch
-  borrowORef
-    oref'
-    (\x -> do
-        liftIO $ do
-          contents <- readIORef x
-          putStrLn contents
-    )
-  return ()
-\end{verbatim}
-
-
-% \section{Preventing Deadlock}
-% % Describe/Define Deadlock
-% TODO
-
-% \subsection{Explicit Resource Ownership Prevents Deadlock}
-% % How ownership prevents deadlock
-% TODO
-
-% \section{Beyond Threads}
-
-% TODO
-
-% How Ownership could be used for resources between processes using D-Bus and also
-% servers in distributed computing.
+How Ownership could be used for resources between processes using D-Bus and also
+servers in distributed computing.
 
 \chapter{Related Works}
 
