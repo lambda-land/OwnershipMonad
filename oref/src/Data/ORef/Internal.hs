@@ -135,10 +135,6 @@ setEntry (ORef i) r w a = do
 adjustEntry :: ORef a -> (Entry -> Entry) -> Own ()
 adjustEntry (ORef i) k = modifyStore (adjust k i)
 
--- | Delete an entry from the store.
--- deleteEntry :: ORef a -> Own ()
--- deleteEntry (ORef i) = modifyStore (delete i)
-
 -- | Get the current flag for reading an ORef.
 getReadFlag :: ORef a -> Own Bool
 getReadFlag oref = fmap readFlag (getEntry oref)
