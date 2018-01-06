@@ -29,6 +29,7 @@ import Control.Monad.State
 import Control.Monad.Trans.Either
 
 import Data.Typeable (Typeable)
+import Data.IORef (newIORef)
 import Data.IntMap (insert)
 import Control.Concurrent (myThreadId)
 
@@ -39,7 +40,8 @@ newORef :: Typeable a => a -> Own (ORef a)
 newORef a = do
     (new,store) <- get
     thrId <- liftIO $ myThreadId
-    let entry = (Entry True True thrId a)
+    v <- liftIO $ newIORef a
+    let entry = (Entry True True thrId (Just v))
     put (new + 1, insert new entry store)
     return (ORef new)
 

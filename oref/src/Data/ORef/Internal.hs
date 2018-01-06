@@ -31,6 +31,7 @@ import Control.Monad.Trans.Either
 import Control.Concurrent
 
 import Data.Typeable (Typeable,cast)
+import Data.IORef
 import Data.IntMap (IntMap, empty, lookup, insert, adjust)
 
 -- | A typed reference to an owned value.
@@ -53,8 +54,13 @@ type Writeable = Bool
 -- a boolean flag indicating whether this ORef can be written to,
 -- the threadID of the owner,
 -- and a value of arbitrary type.
+--
+-- Values in the Entry datatype are wrapped in the Maybe datatype to represent
+-- empty entries.
+--
+-- TODO Separate these into smaller pieces later
 data Entry =
-  forall v. Typeable v => Entry Readable Writeable ThreadId v
+  forall v. Typeable v => Entry Readable Writeable ThreadId (Maybe (IORef v))
 
 -- | The flag of an entry.
 readFlag :: Entry -> Bool
@@ -127,7 +133,8 @@ getEntry (ORef i) = get >>= maybe err return . lookup i . snd
 setEntry :: Typeable a => ORef a -> Bool -> Bool -> a -> Own ()
 setEntry (ORef i) r w a = do
   thrId <- liftIO $ myThreadId
-  modifyStore (insert i (Entry r w thrId a))
+  v <- liftIO $ newIORef a
+  modifyStore (insert i (Entry r w thrId (Just v)))
 
 -- | Adjust an entry in current store
 --
