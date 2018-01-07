@@ -11,7 +11,6 @@ module Data.ORef.Internal
   , checkEntryReadFlag
   , checkEntryWriteFlag
   , checkORef
-  , value
   , getEntry
   , setReadFlag
   , setWriteFlag
