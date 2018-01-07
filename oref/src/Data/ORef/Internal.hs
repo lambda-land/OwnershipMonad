@@ -31,7 +31,7 @@ import Control.Monad.Trans.Either
 import Control.Concurrent
 
 import Data.Typeable (Typeable,cast)
-import Data.IORef
+import Data.IORef (IORef, newIORef, readIORef)
 import Data.IntMap (IntMap, empty, lookup, insert, adjust)
 
 -- | A typed reference to an owned value.
@@ -49,7 +49,9 @@ type Store = IntMap Entry
 type Readable = Bool
 type Writeable = Bool
 
--- | An entry in the store is
+-- | An Entry in the Ownership Monad
+--
+-- An entry in the store is
 -- a boolean flag indicating whether this ORef can be read,
 -- a boolean flag indicating whether this ORef can be written to,
 -- the threadID of the owner,
@@ -71,11 +73,11 @@ writeFlag (Entry _r w _ _) = w
 
 -- | Adjust the flag of an Entry to the given flag
 setEntryReadFlag :: Bool -> Entry -> Entry
-setEntryReadFlag b (Entry _ w t a) = (Entry b w t a)
+setEntryReadFlag b (Entry _ w t v) = (Entry b w t v)
 
 -- | Adjust the flag of an Entry to the given flag
 setEntryWriteFlag :: Bool -> Entry -> Entry
-setEntryWriteFlag b (Entry r _ t a) = (Entry r b t a)
+setEntryWriteFlag b (Entry r _ t v) = (Entry r b t v)
 
 -- | Check if an Entry can be read and if it is in the same thread
 checkEntryReadFlag :: Entry -> IO Bool
@@ -88,6 +90,13 @@ checkEntryWriteFlag :: Entry -> IO Bool
 checkEntryWriteFlag (Entry _r w thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && w
+
+-- | Check if the entry is empty
+--
+-- This will return True if the entry is empty.
+entryEmpty :: Entry -> Bool
+entryEmpty (Entry _r _w _thrId Nothing)  = True
+entryEmpty (Entry _r _w _thrId (Just _)) = False
 
 -- | Check if the entry is able to be read and written to.
 --
@@ -113,16 +122,20 @@ checkORef oref  = do
   entry <- getEntry oref
   ok <- liftIO $ checkEntry entry
   return ok
+-- TODO should this also include if the ORef Entry is an empty Nothing value?
 
--- | The value of an entry casted to the expected type.
-value :: Typeable a => Entry -> a
-value (Entry _ _ _  v) = case cast v of
-    Just a  -> a
+-- | The value inside the IORef of an entry casted to the expected type.
+--
+-- If the value of an entry is Nothing the operation will fail.
+value :: Typeable a => Entry -> IO (Maybe a)
+value (Entry _ _ _  (Just ioref)) = do
+  v <- readIORef ioref
+  case cast v of
+    Just a  -> return (Just a)
     Nothing -> error "internal cast error"
-
--- | Modify the current store.
-modifyStore :: (Store -> Store) -> Own ()
-modifyStore f = modify (\(n,s) -> (n, f s))
+value (Entry _ _ _  Nothing) = return Nothing
+-- TODO does it make sense to have the Maybe value handled elsewhere instead of
+-- within this function?
 
 -- | Get an entry from the store or fail if no such entry exists.
 getEntry :: ORef a -> Own Entry
@@ -130,11 +143,17 @@ getEntry (ORef i) = get >>= maybe err return . lookup i . snd
   where err = error ("entry not found: " ++ show i)
 
 -- | Set an entry in the store.
+--
+-- This will take the value and place it in an IORef inside the Entry.
 setEntry :: Typeable a => ORef a -> Bool -> Bool -> a -> Own ()
 setEntry (ORef i) r w a = do
   thrId <- liftIO $ myThreadId
   v <- liftIO $ newIORef a
   modifyStore (insert i (Entry r w thrId (Just v)))
+
+-- | Modify the current store.
+modifyStore :: (Store -> Store) -> Own ()
+modifyStore f = modify (\(n,s) -> (n, f s))
 
 -- | Adjust an entry in current store
 --
@@ -160,7 +179,14 @@ setWriteFlag oref b = adjustEntry oref (setEntryWriteFlag b)
 
 -- | Get the current value of an ORef.
 getValue :: Typeable a => ORef a -> Own a
-getValue oref = fmap value (getEntry oref)
+getValue oref = do
+  e <- getEntry oref
+  v <- liftIO (value e)
+  case v of
+    Just a -> return a
+    Nothing -> lift $ left "Cannot retrieve the value of an empty ORef"
+-- TODO is is practical to return the failure left case of the Own monad in this
+-- function?
 
 -- | Set the current value of an ORef.
 --
@@ -219,5 +245,5 @@ startOwn x = runEitherT (evalStateT x (0, empty))
 -- discarding the final value
 --
 -- execOwn :: Monad m => Own a -> s -> m s
-execOwn :: Monad m => StateT a1 (EitherT e m) a -> a1 -> m (Either e a1)
+execOwn :: Monad m => StateT a (EitherT e m) b -> a -> m (Either e a)
 execOwn x s = runEitherT (execStateT x s)
