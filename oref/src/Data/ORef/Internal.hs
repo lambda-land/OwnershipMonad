@@ -186,6 +186,7 @@ getValue oref = do
     Nothing -> lift $ left "Cannot retrieve the value of an empty ORef"
 -- TODO is is practical to return the failure left case of the Own monad in this
 -- function?
+-- Should Nothing be returned when the value is Nothing/empty?
 
 -- | Set the current value of an ORef.
 --
@@ -223,26 +224,20 @@ forkOwn innerOps = do
 --
 -- Evaluate an ownership computation with the initial context passed as an
 -- argument.
-evalOwn :: Monad m =>
-  StateT s (EitherT String m) a1 ->
-  s ->
-  m (Either String a1)
+evalOwn :: Own a -> (ID,Store) -> IO (Either String a)
 evalOwn actions startState =
   runEitherT (evalStateT actions startState)
 
 -- | Run an action in the ownership monad and return its result.
 --
 -- This will run the action in an initially empty context
-startOwn :: (Num t, Monad m) =>
-  StateT (t, IntMap a) (EitherT String m) a1 ->
-  m (Either String a1)
+startOwn :: Own a -> IO (Either String a)
 startOwn x = runEitherT (evalStateT x (0, empty))
 
--- TODO get rid of? Not clear this is useful
---
 -- | Evaluate a state computation with a given state and return the final state,
 -- discarding the final value
 --
--- execOwn :: Monad m => Own a -> s -> m s
-execOwn :: Monad m => StateT a (EitherT e m) b -> a -> m (Either e a)
+execOwn :: StateT (ID,Store) (EitherT String IO) a
+  -> (ID,Store)
+  -> IO (Either String (ID,Store))
 execOwn x s = runEitherT (execStateT x s)
