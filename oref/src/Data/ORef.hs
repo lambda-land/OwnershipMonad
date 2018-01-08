@@ -38,7 +38,7 @@ import Control.Concurrent (myThreadId)
 -- | Create a new ORef.
 newORef :: Typeable a => a -> Own (ORef a)
 newORef a = do
-    (new,store) <- get
+    (new, store) <- get
     thrId <- liftIO $ myThreadId
     v <- liftIO $ newIORef a
     let entry = (Entry True True thrId (Just v))
@@ -53,13 +53,13 @@ newORef a = do
 dropORef :: ORef a -> Own ()
 dropORef oref = do
     ok <- checkORef oref  -- Check Read and Write
+    -- TODO check if the oref is already dropped?
+    -- currently the checkORef function does not do this.
     case ok of
       False -> lift $ left "Error during drop operation -\
                            \ make sure old ORef is writable and doesn't have\
                            \ borrowers."
-      True -> do
-        setWriteFlag oref False
-        setReadFlag oref False
+      True -> setEntry oref False False Nothing
 
 -- | Copy the contents of one ORef to another.
 --
@@ -74,6 +74,7 @@ copyORef oref = do
       False -> lift $ left "Error during copy operation"
       True -> do
         -- the new entry is a copy of the old entry but with the write flag set as True
+        -- we are creating a new entry here - which is why we do not change the older ORef
         let newEntry = setEntryWriteFlag True entry
         put (new + 1, insert new newEntry store)
         return (ORef new)

@@ -12,6 +12,7 @@ module Data.ORef.Internal
   , checkEntryWriteFlag
   , checkORef
   , getEntry
+  , setEntry
   , setReadFlag
   , setWriteFlag
   , getValue
@@ -141,14 +142,19 @@ getEntry :: ORef a -> Own Entry
 getEntry (ORef i) = get >>= maybe err return . lookup i . snd
   where err = error ("entry not found: " ++ show i)
 
--- | Set an entry in the store.
+-- | Set the flags and value for an entry in the store.
 --
 -- This will take the value and place it in an IORef inside the Entry.
-setEntry :: Typeable a => ORef a -> Bool -> Bool -> a -> Own ()
-setEntry (ORef i) r w a = do
+setEntry :: Typeable a => ORef a -> Bool -> Bool -> Maybe a -> Own ()
+setEntry (ORef i) r w mValue = do
   thrId <- liftIO $ myThreadId
-  v <- liftIO $ newIORef a
-  modifyStore (insert i (Entry r w thrId (Just v)))
+  case mValue of
+    Just a -> do
+      v <- liftIO $ newIORef a
+      modifyStore (insert i (Entry r w thrId (Just v)))
+    Nothing -> do
+      modifyStore (insert i (Entry r w thrId Nothing))
+      -- TODO make Nothing an instance of Typeable
 
 -- | Modify the current store.
 modifyStore :: (Store -> Store) -> Own ()
@@ -187,6 +193,7 @@ getValue oref = do
 -- TODO is is practical to return the failure left case of the Own monad in this
 -- function?
 -- Should Nothing be returned when the value is Nothing/empty?
+-- Does it make sense to get the value of an empty ORef?
 
 -- | Set the current value of an ORef.
 --
@@ -195,8 +202,16 @@ setValue :: Typeable a => ORef a -> a -> Own ()
 setValue oref a = do
     r <- getReadFlag oref
     w <- getWriteFlag oref
-    setEntry oref r w a
+    setEntry oref r w (Just a)
 
+-- | Set the current value of an ORef to the empty Nothing case.
+--
+-- This will set the value - it will __NOT__ check ownership or thread
+setValueEmpty :: Typeable a => ORef a -> Own ()
+setValueEmpty oref = do
+    r <- getReadFlag oref
+    w <- getWriteFlag oref
+    setEntry oref r w Nothing
 
 -- TODO get rid of continueOwn?
 -- | Evaluate the Ownership monad operations within the context of
@@ -236,8 +251,5 @@ startOwn x = runEitherT (evalStateT x (0, empty))
 
 -- | Evaluate a state computation with a given state and return the final state,
 -- discarding the final value
---
-execOwn :: StateT (ID,Store) (EitherT String IO) a
-  -> (ID,Store)
-  -> IO (Either String (ID,Store))
+execOwn :: Own a -> (ID,Store) -> IO (Either String (ID,Store))
 execOwn x s = runEitherT (execStateT x s)
