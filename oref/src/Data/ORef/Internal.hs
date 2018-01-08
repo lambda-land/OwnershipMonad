@@ -12,11 +12,12 @@ module Data.ORef.Internal
   , checkEntryWriteFlag
   , checkORef
   , getEntry
-  , setEntry
+  -- , setEntry
   , setReadFlag
   , setWriteFlag
   , getValue
   , setValue
+  , setValueEmpty
   -- running the monad
   , forkOwn
   , evalOwn
@@ -213,7 +214,10 @@ setValueEmpty oref = do
     w <- getWriteFlag oref
     setEntry oref r w Nothing
 
+-- | Running the Ownership Monad
+
 -- TODO get rid of continueOwn?
+
 -- | Evaluate the Ownership monad operations within the context of
 -- an existing Ownership monad.
 --

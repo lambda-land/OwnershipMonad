@@ -50,7 +50,7 @@ newORef a = do
 -- This will fail if we try to drop a ORef that we do not own. For that reason a
 -- child thread does not have the ability to change oref's it can see but are
 -- really owned by the parent thread.
-dropORef :: ORef a -> Own ()
+dropORef :: Typeable a => ORef a -> Own ()
 dropORef oref = do
     ok <- checkORef oref  -- Check Read and Write
     -- TODO check if the oref is already dropped?
@@ -59,7 +59,11 @@ dropORef oref = do
       False -> lift $ left "Error during drop operation -\
                            \ make sure old ORef is writable and doesn't have\
                            \ borrowers."
-      True -> setEntry oref False False Nothing
+      True -> do
+        setWriteFlag oref False
+        setReadFlag oref False
+        setValueEmpty oref
+        -- setEntry oref False False Nothing
 
 -- | Copy the contents of one ORef to another.
 --
