@@ -89,7 +89,7 @@ copyORef oref = do
 -- This will also remove the old ORef.
 --
 -- This will fail if the old ORef has borrowers (if either flag is set to false.)
-moveORef :: ORef a -> Own (ORef a)
+moveORef :: Typeable a => ORef a -> Own (ORef a)
 moveORef oldORef = do
     ok <- checkORef oldORef
     -- make sure old ORef is readable and writable and doesn't have borrowers

@@ -31,7 +31,7 @@ import Control.Monad.State
 import Control.Monad.Trans.Either
 import Control.Concurrent
 
-import Data.Typeable (Typeable,cast)
+import Data.Typeable (Typeable, cast)
 import Data.IORef (IORef, newIORef, readIORef)
 import Data.IntMap (IntMap, empty, lookup, insert, adjust)
 
@@ -61,7 +61,6 @@ type Writeable = Bool
 -- Values in the Entry datatype are wrapped in the Maybe datatype to represent
 -- empty entries.
 --
--- TODO Separate these into smaller pieces later
 data Entry =
   forall v. Typeable v => Entry Readable Writeable ThreadId (Maybe (IORef v))
 
@@ -146,16 +145,10 @@ getEntry (ORef i) = get >>= maybe err return . lookup i . snd
 -- | Set the flags and value for an entry in the store.
 --
 -- This will take the value and place it in an IORef inside the Entry.
-setEntry :: Typeable a => ORef a -> Bool -> Bool -> Maybe a -> Own ()
-setEntry (ORef i) r w mValue = do
+setEntry :: Typeable a => ORef a -> Bool -> Bool -> Maybe (IORef a) -> Own ()
+setEntry (ORef i) r w n = do
   thrId <- liftIO $ myThreadId
-  case mValue of
-    Just a -> do
-      v <- liftIO $ newIORef a
-      modifyStore (insert i (Entry r w thrId (Just v)))
-    Nothing -> do
-      modifyStore (insert i (Entry r w thrId Nothing))
-      -- TODO make Nothing an instance of Typeable
+  modifyStore (insert i (Entry r w thrId n))
 
 -- | Modify the current store.
 modifyStore :: (Store -> Store) -> Own ()
@@ -203,7 +196,8 @@ setValue :: Typeable a => ORef a -> a -> Own ()
 setValue oref a = do
     r <- getReadFlag oref
     w <- getWriteFlag oref
-    setEntry oref r w (Just a)
+    v <- liftIO $ newIORef a
+    setEntry oref r w (Just v)
 
 -- | Set the current value of an ORef to the empty Nothing case.
 --
