@@ -4,7 +4,7 @@ Module: Data.ORef.Internal
 Internal types and functions
 -}
 module Data.ORef.Internal
-  ( ORef(ORef)
+  ( ORef(..)
   , Own
   , Entry(..)
   , setEntryWriteFlag
@@ -36,7 +36,16 @@ import Data.IORef (IORef, newIORef, readIORef)
 import Data.IntMap (IntMap, empty, lookup, insert, adjust)
 
 -- | A typed reference to an owned value.
-newtype ORef a = ORef ID
+--
+-- An ORef has a phantom type to ensure that the types of ORef are the same.
+--
+-- An ORef can be pattern matched as `(ORef i)` where the `i` is the integer
+-- ID of the ORef.
+--
+-- The purpose of the ORef newtype is as a wrapper around resource information.
+-- This type is used as a handle for the ownership monad to track resources
+-- (through their ID) and what the type of the underlying resource is.
+newtype ORef a = ORef {getID :: ID}
 
 -- | Ownership Monad with IO in the transformers stack
 type Own a = StateT (ID,Store) (EitherT String IO) a
