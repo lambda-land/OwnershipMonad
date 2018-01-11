@@ -64,10 +64,11 @@ type Writeable = Bool
 data Entry =
   forall v. Typeable v => Entry Readable Writeable ThreadId (Maybe (IORef v))
 
--- | The flag of an entry.
+-- | The read flag of an entry.
 readFlag :: Entry -> Bool
 readFlag (Entry r _w _ _ ) = r
 
+-- | The write flag of an entry
 writeFlag :: Entry -> Bool
 writeFlag (Entry _r w _ _) = w
 
@@ -78,6 +79,13 @@ setEntryReadFlag b (Entry _ w t v) = (Entry b w t v)
 -- | Adjust the flag of an Entry to the given flag
 setEntryWriteFlag :: Bool -> Entry -> Entry
 setEntryWriteFlag b (Entry r _ t v) = (Entry r b t v)
+
+-- | Check if the entry is empty
+--
+-- This will return True if the entry is empty.
+entryIsEmpty :: Entry -> Bool
+entryIsEmpty (Entry _r _w _thrId Nothing)  = True
+entryIsEmpty (Entry _r _w _thrId (Just _)) = False
 
 -- | Check if an Entry can be read and if it is in the same thread
 checkEntryReadFlag :: Entry -> IO Bool
@@ -90,13 +98,6 @@ checkEntryWriteFlag :: Entry -> IO Bool
 checkEntryWriteFlag (Entry _r w thrId _) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && w
-
--- | Check if the entry is empty
---
--- This will return True if the entry is empty.
-entryEmpty :: Entry -> Bool
-entryEmpty (Entry _r _w _thrId Nothing)  = True
-entryEmpty (Entry _r _w _thrId (Just _)) = False
 
 -- | Check if the entry is able to be read and written to.
 --
@@ -126,7 +127,9 @@ checkORef oref  = do
 
 -- | The value inside the IORef of an entry casted to the expected type.
 --
--- If the value of an entry is Nothing the operation will fail.
+-- If the value of an entry is Nothing then Nothing will be returned.
+--
+-- This function will fail if there is a cast error.
 value :: Typeable a => Entry -> IO (Maybe a)
 value (Entry _ _ _  (Just ioref)) = do
   v <- readIORef ioref
@@ -134,8 +137,6 @@ value (Entry _ _ _  (Just ioref)) = do
     Just a  -> return (Just a)
     Nothing -> error "internal cast error"
 value (Entry _ _ _  Nothing) = return Nothing
--- TODO does it make sense to have the Maybe value handled elsewhere instead of
--- within this function?
 
 -- | Get an entry from the store or fail if no such entry exists.
 getEntry :: ORef a -> Own Entry
@@ -144,7 +145,7 @@ getEntry (ORef i) = get >>= maybe err return . lookup i . snd
 
 -- | Set the flags and value for an entry in the store.
 --
--- This will take the value and place it in an IORef inside the Entry.
+-- This will take a value and place it in an IORef inside the Entry.
 setEntry :: Typeable a => ORef a -> Bool -> Bool -> Maybe (IORef a) -> Own ()
 setEntry (ORef i) r w n = do
   thrId <- liftIO $ myThreadId
@@ -156,7 +157,7 @@ modifyStore f = modify (\(n,s) -> (n, f s))
 
 -- | Adjust an entry in current store
 --
--- This is similiar to modifyStore
+-- This is similiar to modifyStore but takes an (Entry -> Entry) function
 adjustEntry :: ORef a -> (Entry -> Entry) -> Own ()
 adjustEntry (ORef i) k = modifyStore (adjust k i)
 
@@ -177,6 +178,8 @@ setWriteFlag :: ORef a -> Bool -> Own ()
 setWriteFlag oref b = adjustEntry oref (setEntryWriteFlag b)
 
 -- | Get the current value of an ORef.
+--
+-- getValue will return a Left error string if the value in the entry is Nothing.
 getValue :: Typeable a => ORef a -> Own a
 getValue oref = do
   e <- getEntry oref
@@ -184,7 +187,7 @@ getValue oref = do
   case v of
     Just a -> return a
     Nothing -> lift $ left "Cannot retrieve the value of an empty ORef"
--- TODO is is practical to return the failure left case of the Own monad in this
+-- TODO is it practical to return the failure left case of the Own monad in this
 -- function?
 -- Should Nothing be returned when the value is Nothing/empty?
 -- Does it make sense to get the value of an empty ORef?
@@ -192,6 +195,8 @@ getValue oref = do
 -- | Set the current value of an ORef.
 --
 -- This will set the value - it will __NOT__ check ownership or thread
+--
+-- Use the setValueEmpty function to set the value of an Entry to Nothing.
 setValue :: Typeable a => ORef a -> a -> Own ()
 setValue oref a = do
     r <- getReadFlag oref
@@ -208,12 +213,11 @@ setValueEmpty oref = do
     w <- getWriteFlag oref
     setEntry oref r w Nothing
 
--- | Running the Ownership Monad
 
--- TODO get rid of continueOwn?
+-- ** Running the Ownership Monad
 
--- | Evaluate the Ownership monad operations within the context of
--- an existing Ownership monad.
+-- | Evaluate the Ownership monad operations within the context of an existing
+-- Ownership monad.
 --
 -- This will use the state from the previous context.
 continueOwn :: Own a -> Own (Either String a)

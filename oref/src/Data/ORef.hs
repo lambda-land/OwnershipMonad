@@ -4,13 +4,16 @@ Module: Data.ORef
 External API, types and functions
 -}
 module Data.ORef
-  ( ORef
+  (
+  -- * Ownership Types
+    ORef
   , Own
-    -- functions
+  -- * Ownership Monad Evaluation
   , forkOwn
   , evalOwn
   , startOwn
   , execOwn
+  -- * Functions to Operate on ORef's
   , newORef
   , dropORef
   , copyORef
@@ -33,8 +36,6 @@ import Data.IORef (newIORef)
 import Data.IntMap (insert)
 import Control.Concurrent (myThreadId)
 
--- ** Public Interface
-
 -- | Create a new ORef.
 newORef :: Typeable a => a -> Own (ORef a)
 newORef a = do
@@ -45,7 +46,7 @@ newORef a = do
     put (new + 1, insert new entry store)
     return (ORef new)
 
--- | Remove an ORef from the current context
+-- | Remove an ORef from the current context.
 --
 -- This will fail if we try to drop a ORef that we do not own. For that reason a
 -- child thread does not have the ability to change oref's it can see but are
@@ -53,22 +54,24 @@ newORef a = do
 dropORef :: Typeable a => ORef a -> Own ()
 dropORef oref = do
     ok <- checkORef oref  -- Check Read and Write
-    -- TODO check if the oref is already dropped?
-    -- currently the checkORef function does not do this.
+    -- TODO Should this check if the oref is already dropped (is a Nothing value)?
+    -- Currently the checkORef function does not do this.
     case ok of
-      False -> lift $ left "Error during drop operation -\
-                           \ make sure old ORef is writable and doesn't have\
-                           \ borrowers."
+      False -> lift $
+        left "Error during drop operation.\
+             \ Make sure old ORef is writable and doesn't have borrowers."
       True -> do
         setWriteFlag oref False
         setReadFlag oref False
         setValueEmpty oref
-        -- setEntry oref False False Nothing
 
 -- | Copy the contents of one ORef to another.
 --
 -- A child thread should not be able to copy from its parent.
 -- As long as the threadId is the same copies of an ORef can be made.
+--
+-- The new entry is a copy of the old entry but with the write flag set as True.
+-- We are creating a new entry which is why we do not change the older ORef.
 copyORef :: ORef a -> Own (ORef a)
 copyORef oref = do
     (new, store) <- get
@@ -77,8 +80,6 @@ copyORef oref = do
     case ok of
       False -> lift $ left "Error during copy operation"
       True -> do
-        -- the new entry is a copy of the old entry but with the write flag set as True
-        -- we are creating a new entry here - which is why we do not change the older ORef
         let newEntry = setEntryWriteFlag True entry
         put (new + 1, insert new newEntry store)
         return (ORef new)
@@ -94,8 +95,9 @@ moveORef oldORef = do
     ok <- checkORef oldORef
     -- make sure old ORef is readable and writable and doesn't have borrowers
     case ok of
-      False -> lift $ left "Error during move from an oref to a new oref\
-                           \ check entry failed for the exisiting (old) oref."
+      False -> lift $
+        left "Error during move from an oref to a new oref\
+             \ check entry failed for the existing (old) oref."
       True -> do
         new <- copyORef oldORef
         dropORef oldORef
@@ -105,14 +107,15 @@ moveORef oldORef = do
 
 -- | Move the contents of one ORef to an existing ORef.
 --
--- This will fail if either ORefs have borrowers
+-- This will fail if either ORefs have borrowers.
 moveORef' :: Typeable a => ORef a -> ORef a -> Own ()
 moveORef' oORef nORef = do
     ok <- checkORef oORef
     -- makes sure old ORef is readable and writable and doesn't have borrowers
     case ok of
-      False -> lift $ left "Error during move from oref to an existing oref -\
-                           \ check entry failed for old oref."
+      False -> lift $
+        left "Error during move from oref to an existing oref.\
+             \ Checking the entry failed for the old oref."
       True -> do
         oldORefValue <- getValue oORef
         dropORef oORef
@@ -120,8 +123,9 @@ moveORef' oORef nORef = do
         newORefOK <- checkORef nORef
         -- make sure the new ORef is writable/doesn't have borrowers
         case newORefOK of
-          False -> lift $ left "Error during move from oref to an existing oref -\
-                               \ check entty failed for new oref."
+          False -> lift $
+            left "Error during move from oref to an existing oref.\
+                 \ Checking the entry failed for the new oref."
           True -> setValue nORef oldORefValue
 
 -- | Borrow an ORef and use it in the given continuation.
@@ -133,7 +137,7 @@ moveORef' oORef nORef = do
 --
 -- We will not be mutating the ORef that is being read. For that reason a
 -- borrowORef operation can have multiple functions at the same time for the same
--- ORef. This is similiar to having multiple immutable borrowers.
+-- ORef. This is similar to having multiple immutable borrowers.
 --
 -- The function is of type (a -> Own b) and it will operate by using the value
 -- inside the ORef but not the ORef itself.
@@ -150,9 +154,10 @@ borrowORef oref k = do
     ok <- checkORef oref
     -- This will check if we can read the entry and if it is in our thread
     case ok of
-      False -> lift $ left "Error during borrow operation - this occured while\
-                           \ checking if the entry was in in the same thread\
-                           \ or if it could be read returned false."
+      False -> lift $
+        left "Error during borrow operation - this occurred while\
+             \ checking if the entry was in in the same thread\
+             \ or if it could be read returned false."
       True -> do
         setWriteFlag oref False  -- set the oref write flag to false since it is being borrowed
         setReadFlag oref False
@@ -174,9 +179,10 @@ mutableBorrowORef :: Typeable a => ORef a -> (a -> Own a) -> Own ()
 mutableBorrowORef oref k = do
     ok <- checkORef oref -- check if the ORef can be read and written to
     case ok of
-      False -> lift $ left "Error during mutable operation - checking if the\
-                           \ entry was in in the same thread or if it could be\
-                           \ read and written to returned false."
+      False -> lift $
+        left "Error during mutable operation - checking if the\
+             \ entry was in the same thread or if it could be\
+             \ read and written to returned false."
       True -> do
         setWriteFlag oref False
         setReadFlag oref False
@@ -191,7 +197,8 @@ writeORef :: Typeable a => ORef a -> a -> Own ()
 writeORef oref a = do
     ok <- checkORef oref -- check if the ORef can be read and written to
     case ok of
-      False -> lift $ left "Error during write operation - checking if the entry\
-                           \ could be written to or if it was in the same thread\
-                           \ returned False."
+      False -> lift $
+        left "Error during write operation - checking if the entry\
+             \ could be written to or if it was in the same thread\
+             \ returned False."
       True -> setValue oref a
