@@ -7,14 +7,17 @@ module Data.ORef.Internal
   ( ORef(..)
   , Own
   , Entry(..)
-  , setEntryWriteFlag
+  -- , setEntryLocked
+  -- , setEntryReadable
+  , setEntryWritable
   , checkEntryReadFlag
   , checkEntryWriteFlag
   , checkORef
   , getEntry
   -- , setEntry
-  , setReadFlag
-  , setWriteFlag
+  , setORefLocked
+  , setORefReadable
+  , setORefWritable
   , getValue
   , setValue
   , setValueEmpty
@@ -56,14 +59,14 @@ type ID = Int
 -- | Store that maps IDs to entries.
 type Store = IntMap Entry
 
-type Readable = Bool
-type Writeable = Bool
+data Flag = Locked
+          | Readable
+          | Writable
 
 -- | An Entry in the Ownership Monad
 --
 -- An entry in the store is
--- a boolean flag indicating whether this ORef can be read,
--- a boolean flag indicating whether this ORef can be written to,
+-- a flag,
 -- the threadID of the owner,
 -- and a value of arbitrary type.
 --
@@ -71,43 +74,63 @@ type Writeable = Bool
 -- empty entries.
 --
 data Entry =
-  forall v. Typeable v => Entry Readable Writeable ThreadId (Maybe (IORef v))
+  forall v. Typeable v => Entry Flag ThreadId (Maybe (IORef v))
 
--- | The read flag of an entry.
-readFlag :: Entry -> Bool
-readFlag (Entry r _w _ _ ) = r
+-- | The flag of an entry.
+flag :: Entry -> Flag
+flag (Entry f _ _) = f
 
--- | The write flag of an entry
-writeFlag :: Entry -> Bool
-writeFlag (Entry _r w _ _) = w
+-- | Check if the Entry is locked
+locked :: Entry -> Bool
+locked (Entry Locked _ _) = True
+locked (Entry _ _ _) = False
 
--- | Adjust the flag of an Entry to the given flag
-setEntryReadFlag :: Bool -> Entry -> Entry
-setEntryReadFlag b (Entry _ w t v) = (Entry b w t v)
+-- | Check if an entry is readable
+--
+-- An Entry is readable if it is readable or writable
+readable :: Entry -> Bool
+readable (Entry Locked _ _) = False
+readable (Entry _ _ _) = True
 
--- | Adjust the flag of an Entry to the given flag
-setEntryWriteFlag :: Bool -> Entry -> Entry
-setEntryWriteFlag b (Entry r _ t v) = (Entry r b t v)
+-- | Check if the entry is writable
+writable :: Entry -> Bool
+writable (Entry Writable _ _) = True
+writable (Entry _ _ _) = False
+
+-- | Adjust the flag of an Entry to Writable
+setEntryLocked :: Entry -> Entry
+setEntryLocked (Entry _ t v) = (Entry Locked t v)
+
+-- | Adjust the flag of an Entry to Readable
+setEntryReadable :: Entry -> Entry
+setEntryReadable (Entry _ t v) = (Entry Readable t v)
+
+-- | Adjust the flag of an Entry to Writable
+setEntryWritable :: Entry -> Entry
+setEntryWritable (Entry _ t v) = (Entry Writable t v)
+
 
 -- | Check if the entry is empty
 --
 -- This will return True if the entry is empty.
 entryIsEmpty :: Entry -> Bool
-entryIsEmpty (Entry _r _w _thrId Nothing)  = True
-entryIsEmpty (Entry _r _w _thrId (Just _)) = False
+entryIsEmpty (Entry _f _thrId Nothing)  = True
+entryIsEmpty (Entry _f _thrId (Just _)) = False
 
 -- | Check if an Entry can be read and if it is in the same thread
 checkEntryReadFlag :: Entry -> IO Bool
-checkEntryReadFlag (Entry r _w thrId _) = do
+checkEntryReadFlag entry@(Entry _f thrId _v) = do
   threadId <- myThreadId
-  return $ (threadId == thrId) && r
+  return $ (threadId == thrId) && readable entry
 
 -- | Check if an Entry can be written to and if it is in the same thread
 checkEntryWriteFlag :: Entry -> IO Bool
-checkEntryWriteFlag (Entry _r w thrId _) = do
+checkEntryWriteFlag entry@(Entry _f thrId _v) = do
   threadId <- myThreadId
-  return $ (threadId == thrId) && w
+  return $ (threadId == thrId) && writable entry
 
+-- TODO checkEntryWriteFlag and checkEntry are the same now.
+-- Remove one of them.
 -- | Check if the entry is able to be read and written to.
 --
 -- This will also check if the thread ID of the current thread matches the
@@ -116,9 +139,9 @@ checkEntryWriteFlag (Entry _r w thrId _) = do
 -- Checking the thread is done to prevent a child from using ORef's that it
 -- inherited from its parent but was not explicitely given.
 checkEntry :: Entry -> IO Bool
-checkEntry (Entry r w thrId _) = do
+checkEntry entry@(Entry _f thrId _v) = do
   threadId <- myThreadId
-  return $ (threadId == thrId) && r && w
+  return $ (threadId == thrId) && writable entry
 
 -- | Check if the ORef is able to be read and written to.
 --
@@ -140,25 +163,25 @@ checkORef oref  = do
 --
 -- This function will fail if there is a cast error.
 value :: Typeable a => Entry -> IO (Maybe a)
-value (Entry _ _ _  (Just ioref)) = do
+value (Entry _ _ (Just ioref)) = do
   v <- readIORef ioref
   case cast v of
     Just a  -> return (Just a)
     Nothing -> error "internal cast error"
-value (Entry _ _ _  Nothing) = return Nothing
+value (Entry _ _ Nothing) = return Nothing
 
 -- | Get an entry from the store or fail if no such entry exists.
 getEntry :: ORef a -> Own Entry
 getEntry (ORef i) = get >>= maybe err return . lookup i . snd
   where err = error ("entry not found: " ++ show i)
 
--- | Set the flags and value for an entry in the store.
+-- | Set the flag and value for an entry in the store.
 --
 -- This will take a value and place it in an IORef inside the Entry.
-setEntry :: Typeable a => ORef a -> Bool -> Bool -> Maybe (IORef a) -> Own ()
-setEntry (ORef i) r w n = do
+setEntry :: Typeable a => ORef a -> Flag -> Maybe (IORef a) -> Own ()
+setEntry (ORef i) f n = do
   thrId <- liftIO $ myThreadId
-  modifyStore (insert i (Entry r w thrId n))
+  modifyStore (insert i (Entry f thrId n))
 
 -- | Modify the current store.
 modifyStore :: (Store -> Store) -> Own ()
@@ -170,21 +193,32 @@ modifyStore f = modify (\(n,s) -> (n, f s))
 adjustEntry :: ORef a -> (Entry -> Entry) -> Own ()
 adjustEntry (ORef i) k = modifyStore (adjust k i)
 
--- | Get the current flag for reading an ORef.
-getReadFlag :: ORef a -> Own Bool
-getReadFlag oref = fmap readFlag (getEntry oref)
+-- | Check if the current flag for an ORef's entry is locked
+checkORefLocked :: ORef a -> Own Bool
+checkORefLocked oref = fmap locked (getEntry oref)
 
--- | Get the current flag for writing to an ORef.
-getWriteFlag :: ORef a -> Own Bool
-getWriteFlag oref = fmap writeFlag (getEntry oref)
+-- | Check if the current flag for an ORef's entry is readable
+checkORefReadable :: ORef a -> Own Bool
+checkORefReadable oref = fmap readable (getEntry oref)
 
--- | Set the read flag for an ORef.
-setReadFlag :: ORef a -> Bool -> Own ()
-setReadFlag oref b = adjustEntry oref (setEntryReadFlag b)
+-- | Check if the current flag for an ORef's entry is writable
+checkORefWritable :: ORef a -> Own Bool
+checkORefWritable oref = fmap writable (getEntry oref)
 
--- | Set the write flag for an ORef.
-setWriteFlag :: ORef a -> Bool -> Own ()
-setWriteFlag oref b = adjustEntry oref (setEntryWriteFlag b)
+-- | Set the flag for an ORef to locked
+setORefLocked :: ORef a -> Own ()
+setORefLocked oref = adjustEntry oref setEntryLocked
+
+-- | Set the flag for an ORef to readable
+setORefReadable :: ORef a -> Own ()
+setORefReadable oref = adjustEntry oref setEntryReadable
+
+-- | Set the flag for an ORef to writable.
+setORefWritable :: ORef a -> Own ()
+setORefWritable oref = adjustEntry oref setEntryWritable
+
+getFlag :: ORef a -> Own Flag
+getFlag oref = fmap flag (getEntry oref)
 
 -- | Get the current value of an ORef.
 --
@@ -208,19 +242,17 @@ getValue oref = do
 -- Use the setValueEmpty function to set the value of an Entry to Nothing.
 setValue :: Typeable a => ORef a -> a -> Own ()
 setValue oref a = do
-    r <- getReadFlag oref
-    w <- getWriteFlag oref
+    f <- getFlag oref
     v <- liftIO $ newIORef a
-    setEntry oref r w (Just v)
+    setEntry oref f (Just v)
 
 -- | Set the current value of an ORef to the empty Nothing case.
 --
 -- This will set the value - it will __NOT__ check ownership or thread
 setValueEmpty :: Typeable a => ORef a -> Own ()
 setValueEmpty oref = do
-    r <- getReadFlag oref
-    w <- getWriteFlag oref
-    setEntry oref r w Nothing
+    f <- getFlag oref
+    setEntry oref f Nothing
 
 
 -- ** Running the Ownership Monad
