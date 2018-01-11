@@ -36,7 +36,7 @@ import Data.IORef (IORef, newIORef, readIORef)
 import Data.IntMap (IntMap, empty, lookup, insert, adjust)
 
 -- | A typed reference to an owned value.
-data ORef a = ORef ID
+newtype ORef a = ORef ID
 
 -- | Ownership Monad with IO in the transformers stack
 type Own a = StateT (ID,Store) (EitherT String IO) a
