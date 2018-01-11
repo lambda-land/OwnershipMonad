@@ -6,12 +6,13 @@ Internal types and functions
 module Data.ORef.Internal
   ( ORef(..)
   , Own
+  , Flag(..)
   , Entry(..)
   -- , setEntryLocked
   -- , setEntryReadable
   , setEntryWritable
-  , checkEntryReadFlag
-  , checkEntryWriteFlag
+  , checkEntryReadable
+  , checkEntryWritable
   , checkORef
   , getEntry
   -- , setEntry
@@ -117,15 +118,15 @@ entryIsEmpty :: Entry -> Bool
 entryIsEmpty (Entry _f _thrId Nothing)  = True
 entryIsEmpty (Entry _f _thrId (Just _)) = False
 
--- | Check if an Entry can be read and if it is in the same thread
-checkEntryReadFlag :: Entry -> IO Bool
-checkEntryReadFlag entry@(Entry _f thrId _v) = do
+-- | Check if an Entry can be read and if it is in the same thread.
+checkEntryReadable :: Entry -> IO Bool
+checkEntryReadable entry@(Entry _f thrId _v) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && readable entry
 
--- | Check if an Entry can be written to and if it is in the same thread
-checkEntryWriteFlag :: Entry -> IO Bool
-checkEntryWriteFlag entry@(Entry _f thrId _v) = do
+-- | Check if an Entry can be written to and if it is in the same thread.
+checkEntryWritable :: Entry -> IO Bool
+checkEntryWritable entry@(Entry _f thrId _v) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && writable entry
 

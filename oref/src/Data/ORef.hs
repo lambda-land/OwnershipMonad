@@ -42,7 +42,7 @@ newORef a = do
     (new, store) <- get
     thrId <- liftIO $ myThreadId
     v <- liftIO $ newIORef a
-    let entry = (Entry True True thrId (Just v))
+    let entry = (Entry Writable thrId (Just v))
     put (new + 1, insert new entry store)
     return (ORef new)
 
@@ -53,7 +53,7 @@ newORef a = do
 -- really owned by the parent thread.
 dropORef :: Typeable a => ORef a -> Own ()
 dropORef oref = do
-    ok <- checkORef oref  -- Check Read and Write
+    ok <- checkORef oref  -- Check Flag
     -- TODO Should this check if the oref is already dropped (is a Nothing value)?
     -- Currently the checkORef function does not do this.
     case ok of
@@ -61,8 +61,7 @@ dropORef oref = do
         left "Error during drop operation.\
              \ Make sure old ORef is writable and doesn't have borrowers."
       True -> do
-        setWriteFlag oref False
-        setReadFlag oref False
+        setORefLocked oref
         setValueEmpty oref
 
 -- | Copy the contents of one ORef to another.
@@ -76,14 +75,13 @@ copyORef :: ORef a -> Own (ORef a)
 copyORef oref = do
     (new, store) <- get
     entry <- getEntry oref
-    ok <- liftIO $ checkEntryReadFlag entry
+    ok <- liftIO $ checkEntryReadable entry
     case ok of
       False -> lift $ left "Error during copy operation"
       True -> do
-        let newEntry = setEntryWriteFlag True entry
+        let newEntry = setEntryWritable entry
         put (new + 1, insert new newEntry store)
         return (ORef new)
-
 
 -- | Move the contents of one ORef to a new ORef.
 --
@@ -159,12 +157,10 @@ borrowORef oref k = do
              \ checking if the entry was in in the same thread\
              \ or if it could be read returned false."
       True -> do
-        setWriteFlag oref False  -- set the oref write flag to false since it is being borrowed
-        setReadFlag oref False
+        setORefLocked oref  -- set the oref flag to locked since it is being borrowed
         v <- getValue oref
         b <- k v -- use the value in the oref
-        setReadFlag oref True
-        setWriteFlag oref True
+        setORefWritable oref -- Set the ORef to writable
         return b
 
 -- | Borrow an ORef in a mutable way.
@@ -184,13 +180,11 @@ mutableBorrowORef oref k = do
              \ entry was in the same thread or if it could be\
              \ read and written to returned false."
       True -> do
-        setWriteFlag oref False
-        setReadFlag oref False
+        setORefLocked oref  -- set the oref flag to locked since it is being borrowed
         v <- getValue oref
         b <- k v -- use the value in the oref
         setValue oref b -- update the ORef
-        setWriteFlag oref True
-        setReadFlag oref True
+        setORefWritable oref -- Set the ORef to writable
 
 -- | Write to an ORef or fail if it is not writable.
 writeORef :: Typeable a => ORef a -> a -> Own ()
