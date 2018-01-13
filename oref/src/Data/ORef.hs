@@ -19,9 +19,10 @@ module Data.ORef
   , copyORef
   , moveORef
   , moveORef'
-  , borrowORef
-  , mutableBorrowORef
   , writeORef
+  , borrowORef
+  , borrowORef'
+  , readORef
   ) where
 
 import Prelude hiding (lookup)
@@ -51,6 +52,9 @@ newORef a = do
 -- This will fail if we try to drop a ORef that we do not own. For that reason a
 -- child thread does not have the ability to change oref's it can see but are
 -- really owned by the parent thread.
+--
+-- A dropped ORef will have a flag in its entry that is set to Locked.
+-- The value in the entry will be set to Nothing.
 dropORef :: Typeable a => ORef a -> Own ()
 dropORef oref = do
     ok <- checkORef oref  -- Check Flag
@@ -59,7 +63,8 @@ dropORef oref = do
     case ok of
       False -> lift $
         left "Error during drop operation.\
-             \ Make sure old ORef is writable and doesn't have borrowers."
+             \ Make sure ORef intended to be dropped is writable and within this\
+             \ thread."
       True -> do
         setORefLocked oref
         setValueEmpty oref
@@ -75,7 +80,7 @@ copyORef :: ORef a -> Own (ORef a)
 copyORef oref = do
     (new, store) <- get
     entry <- getEntry oref
-    ok <- liftIO $ checkEntryReadable entry
+    ok <- liftIO $ inThreadAndReadable entry
     case ok of
       False -> lift $ left "Error during copy operation"
       True -> do
@@ -126,12 +131,20 @@ moveORef' oORef nORef = do
                  \ Checking the entry failed for the new oref."
           True -> setValue nORef oldORefValue
 
+-- | Write to an ORef or fail if it is not writable.
+writeORef :: Typeable a => ORef a -> a -> Own ()
+writeORef oref a = do
+    ok <- checkORef oref -- check if the ORef can be read and written to
+    case ok of
+      False -> lift $
+        left "Error during write operation - checking if the entry\
+             \ could be written to or if it was in the same thread\
+             \ returned False."
+      True -> setValue oref a
+
 -- | Borrow an ORef and use it in the given continuation.
 --
--- A borrow is the temporary and immutable use of the value within an ORef
--- before we hand it back to the original owner.
---
--- For a borrowORef operation we only care about if the ORef can be read.
+-- A borrow is the temporary use of the value within an ORef.
 --
 -- We will not be mutating the ORef that is being read. For that reason a
 -- borrowORef operation can have multiple functions at the same time for the same
@@ -150,12 +163,12 @@ moveORef' oORef nORef = do
 borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
 borrowORef oref k = do
     ok <- checkORef oref
-    -- This will check if we can read the entry and if it is in our thread
     case ok of
       False -> lift $
-        left "Error during borrow operation - this occurred while\
-             \ checking if the entry was in in the same thread\
-             \ or if it could be read returned false."
+        left "Error during borrow operation.\
+             \ The checks for if the entry was in the same thread\
+             \ as the borrow operation and if the entry could be written to\
+             \ returned false."
       True -> do
         setORefLocked oref  -- set the oref flag to locked since it is being borrowed
         v <- getValue oref
@@ -163,16 +176,17 @@ borrowORef oref k = do
         setORefWritable oref -- Set the ORef to writable
         return b
 
--- | Borrow an ORef in a mutable way.
+-- | Borrow and set the value in the ORef entry.
 --
 -- If a function can be read and written to then it can be borrowed by a single
--- function. This function will apply the function. and the value of the ORef
--- will be updated.
+-- function.
+-- This function will apply the function and set the value of the ORef
+-- to the output of the function.
 --
 -- This allows one function to have the ability to operate on the value
 -- inside an ORef and mutate it.
-mutableBorrowORef :: Typeable a => ORef a -> (a -> Own a) -> Own ()
-mutableBorrowORef oref k = do
+borrowORef' :: Typeable a => ORef a -> (a -> Own a) -> Own ()
+borrowORef' oref k = do
     ok <- checkORef oref -- check if the ORef can be read and written to
     case ok of
       False -> lift $
@@ -180,19 +194,18 @@ mutableBorrowORef oref k = do
              \ entry was in the same thread or if it could be\
              \ read and written to returned false."
       True -> do
-        setORefLocked oref  -- set the oref flag to locked since it is being borrowed
-        v <- getValue oref
-        b <- k v -- use the value in the oref
-        setValue oref b -- update the ORef
-        setORefWritable oref -- Set the ORef to writable
+        b <- borrowORef oref k
+        writeORef oref b -- update the ORef
 
--- | Write to an ORef or fail if it is not writable.
-writeORef :: Typeable a => ORef a -> a -> Own ()
-writeORef oref a = do
-    ok <- checkORef oref -- check if the ORef can be read and written to
-    case ok of
-      False -> lift $
-        left "Error during write operation - checking if the entry\
-             \ could be written to or if it was in the same thread\
-             \ returned False."
-      True -> setValue oref a
+-- | Get the value out of the ORef
+--
+-- Reading an ORef will reveal what the contents of the ORef was
+-- when the read operation was performed.
+--
+-- The ORef will continue to exist after this operation and the value
+-- inside it will change.
+--
+-- In order to run a function on the current contents of an ORef please
+-- use the borrowORef operations.
+readORef :: Typeable a => ORef a -> Own a
+readORef oref = borrowORef oref return

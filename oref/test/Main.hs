@@ -240,7 +240,7 @@ darkMagic x = startOwn $ do
 -- | deadlock with normal MVars
 --
 -- If you run this in ghci, it will usually—but not always—print nothing.
--- 
+--
 -- Adapted from Real World Haskell's example on deadlock with MVar's
 -- TODO Cite Chapter 24 of Real World Haskell
 nestedModification outer inner = do
@@ -255,7 +255,7 @@ deadlockMVar = do
   b <- newMVar 2
   forkIO $ nestedModification a b
   forkIO $ nestedModification b a
-  
+
 -- |  with normal mvars
 -- Adapted for ORef from Real World Haskell's example on deadlock with MVar's
 -- TODO Cite Chapter 24 of Real World Haskell
@@ -353,7 +353,7 @@ main = do
   putStrLn (show m)
 
   -- Run these two in GHCi
-  
+
   putStrLn "\nDeadlock MVar"
   dlmv <- deadlockMVar
   putStrLn $ show dlmv

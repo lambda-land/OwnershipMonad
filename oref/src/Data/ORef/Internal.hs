@@ -11,8 +11,7 @@ module Data.ORef.Internal
   -- , setEntryLocked
   -- , setEntryReadable
   , setEntryWritable
-  , checkEntryReadable
-  , checkEntryWritable
+  , inThreadAndReadable
   , checkORef
   , getEntry
   -- , setEntry
@@ -119,16 +118,17 @@ entryIsEmpty (Entry _f _thrId Nothing)  = True
 entryIsEmpty (Entry _f _thrId (Just _)) = False
 
 -- | Check if an Entry can be read and if it is in the same thread.
-checkEntryReadable :: Entry -> IO Bool
-checkEntryReadable entry@(Entry _f thrId _v) = do
+inThreadAndReadable :: Entry -> IO Bool
+inThreadAndReadable entry@(Entry _f thrId _v) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && readable entry
 
+-- TODO This function is not really needed anymore. Get rid of?
 -- | Check if an Entry can be written to and if it is in the same thread.
-checkEntryWritable :: Entry -> IO Bool
-checkEntryWritable entry@(Entry _f thrId _v) = do
-  threadId <- myThreadId
-  return $ (threadId == thrId) && writable entry
+-- checkEntryWritable :: Entry -> IO Bool
+-- checkEntryWritable entry@(Entry _f thrId _v) = do
+--   threadId <- myThreadId
+--   return $ (threadId == thrId) && writable entry
 
 -- TODO checkEntryWriteFlag and checkEntry are the same now.
 -- Remove one of them.
