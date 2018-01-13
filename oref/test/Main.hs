@@ -261,9 +261,9 @@ deadlockMVar = do
 -- TODO Cite Chapter 24 of Real World Haskell
 nestedModificationORef :: (Typeable a, Num a) => ORef a -> ORef a -> Own ()
 nestedModificationORef outer inner = do
-  mutableBorrowORef outer $ \x -> do
+  borrowORef' outer $ \x -> do
     liftIO $ yield  -- force this thread to temporarily yield the CPU
-    mutableBorrowORef inner $ \y -> return (y + 1)
+    borrowORef' inner $ \y -> return (y + 1)
     return (x + 1)
   liftIO $ putStrLn "done - ORef deadlock example"
 

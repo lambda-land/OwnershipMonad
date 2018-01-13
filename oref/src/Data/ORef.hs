@@ -183,6 +183,13 @@ borrowORef oref k = do
 -- This function will apply the function and set the value of the ORef
 -- to the output of the function.
 --
+-- This function is provided for convenience. The same thing could be
+-- achieved with a read operation and then a write operation.
+--
+-- ORef's store values as mutable references internally.
+-- The guarantees of safety cannot be made if an ORef is given a mutable
+-- value (such as an IORef or an MVar) to store.
+--
 -- This allows one function to have the ability to operate on the value
 -- inside an ORef and mutate it.
 borrowORef' :: Typeable a => ORef a -> (a -> Own a) -> Own ()
@@ -190,7 +197,7 @@ borrowORef' oref k = do
     ok <- checkORef oref -- check if the ORef can be read and written to
     case ok of
       False -> lift $
-        left "Error during mutable operation - checking if the\
+        left "Error during borrow and set operation. Checking if the\
              \ entry was in the same thread or if it could be\
              \ read and written to returned false."
       True -> do
