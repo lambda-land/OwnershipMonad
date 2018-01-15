@@ -170,6 +170,9 @@ Uniqueness types in Idris, ownership typing in Rust, and the ownership system
 make use of the idea that by tracking resource use and applying rules to how
 resources are used - certain properties can be enforced.
 % TODO Such as? Briefly what these are here
+
+\section{Implementation}
+
 The type of the ownership monad:
 
 \begin{verbatim}
@@ -179,22 +182,53 @@ type Own a = StateT (ID,Store) (EitherT String IO) a
 State is represented using the \texttt{StateT} monad transformer.
 The ownership monad needs to track the state of ownership system operations
 that occur within its context but it does not need to be aware of the
-operations occurring in other ownership monads. This latter aspect will become
-important when discussing Owned Channels between separate threads later on.
+operations occurring in other ownership monads.
+This latter aspect will become important when discussing Owned Channels between
+separate threads later on.
 
-The parts which make the state in the ownership monad are the next \texttt{ID}
+The state in the ownership monad is comprised of the next \texttt{ID}
 to use and the current \texttt{Store}.  The \texttt{Store} maps each unique
 reference \texttt{ID} to an \texttt{Entry}.
 
 \begin{verbatim}
-data Entry = 
-  forall v. Typeable v => Entry Readable Writeable ThreadId v
+data Entry =
+  forall v. Typeable v => Entry Flag ThreadId (Maybe (IORef v))
 \end{verbatim}
 
-Each owned reference \texttt{Entry} stores a Boolean flag to indicate whether
-that reference is readable and if it is writable.
-In addition to the resource stored in the reference the threadID of the owned
-reference is also stored.
+% TODO explain the forall v.
+% TOOD also explain typeable in Entry
+
+Each owned reference \texttt{Entry} maintains a \texttt{Flag} to indicate the
+level of access currently allowed by the ownership monad on the entry's value.
+% TODO explain what each of these are.
+
+The ID of the thread which owns the entry is also stored as part of the
+\texttt{Entry} datatype. 
+
+\begin{verbatim}
+data Flag = Locked
+          | Readable
+          | Writable
+\end{verbatim}
+
+The value \texttt{v} in an \texttt{Entry} is maintained within the
+\texttt{(Maybe (IORef v))} field of the entry datatype.
+The \texttt{Maybe} datatype allows an empty entry to be represented.
+Empty entries are created when entries are dropped from one ownership monad's
+context.  This allows the Glasgow Haskell Compiler to know that
+the runtime memory storing the prior value in an entry can be freed.
+
+Internally the value stored in a non-empty entry is placed in an \texttt{IORef}.
+An \texttt{IORef} in Haskell is a mutable reference in the IO monad - an IO
+reference.
+The ownership monad uses entries to store the values assigned to owned
+references. One of the primary motivations for using the ownership monad
+is as a safer way to introduce mutability into a Haskell program.
+The values in entries are mutable but they are encased in the ownership system
+types which control access to the resource.
+This will be discussed later on when talking about operations for working with
+owned references.
+
 
 \section{The Ownership System}
 
@@ -202,6 +236,20 @@ Resources are bound to a variable once they are created inside the ownership
 monad.  These variables are the mechanism to access - or refer to - the
 underlying resource.  In the library these variables are called ORef's
 or \textit{Owned References}.
+
+The type of an \texttt{ORef} is a thin wrapper around a way to tag and identify
+resources. 
+
+\begin{verbatim}
+newtype ORef a = ORef {getID :: ID}
+\end{verbatim}
+
+% TODO add explanation of the phantom type a and why it is needed.
+An \texttt{ORef} is a parameterized abstract data type.
+The polymorphic \texttt{a} allows any type to be stored in an \texttt{ORef}.
+This datatype serves to provide a handle on each resource for the \texttt{Own}
+monad to use as it enforces ownership typing rules and tracks each resource.
+
 
 When the operations inside that monad are complete the references
 will no longer exist and the resources will be marked as free.
@@ -260,17 +308,6 @@ ownership operations.
 % Resources that are put into references can only have one owner at any given
 % time. The reference bound to the newly initialized resource becomes the sole
 % owner of that resource. 
-The type of an \texttt{ORef} is a thin wrapper around a way to tag and identify
-resources.
-
-\begin{verbatim}
-data ORef a = ORef ID
-\end{verbatim}
-
-An \texttt{ORef} is a parameterized abstract data type. The polymorphic
-\texttt{a} allows any type to be stored in an \texttt{ORef}.
-This datatype serves to provide a handle on each resource for the \texttt{Own}
-monad to use as it enforces ownership typing rules and tracks each resource.
 
 \subsection{Copying a Reference}
 

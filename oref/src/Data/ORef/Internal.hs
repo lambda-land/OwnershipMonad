@@ -123,15 +123,6 @@ inThreadAndReadable entry@(Entry _f thrId _v) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && readable entry
 
--- TODO This function is not really needed anymore. Get rid of?
--- | Check if an Entry can be written to and if it is in the same thread.
--- checkEntryWritable :: Entry -> IO Bool
--- checkEntryWritable entry@(Entry _f thrId _v) = do
---   threadId <- myThreadId
---   return $ (threadId == thrId) && writable entry
-
--- TODO checkEntryWriteFlag and checkEntry are the same now.
--- Remove one of them.
 -- | Check if the entry is able to be read and written to.
 --
 -- This will also check if the thread ID of the current thread matches the
