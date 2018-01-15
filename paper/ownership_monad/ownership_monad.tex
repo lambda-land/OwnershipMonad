@@ -203,7 +203,7 @@ constraint on the type variable \texttt{v}.
 The combination of these allows for the references in the state to be
 heterogeneous.
 Otherwise it would be necessary to limit the \texttt{Store} to owned
-references of only one type per monadic state.
+references of only one type per monadic state. % Right?
 Using the \texttt{Typeable} typeclass does require that values in each entry are
 \texttt{cast} in a type-cast operation.  However this is handled internally
 by the library when values are retrieved from an entry.
@@ -215,7 +215,7 @@ as a concrete type rather than a polymorphic value.
 Using the existentially quantified \texttt{forall v} also provides the
 ancillary benefit that the \texttt{Entry} datatype does not need a type
 variable.
-As a result the \texttt{Store} type does not need to be a parameterized abstract
+As a result, the \texttt{Store} type does not need to be a parameterized abstract
 data type and can instead be a simple mapping between an integer ID and an entry.
 
 \begin{verbatim}
@@ -237,7 +237,8 @@ The ID of the thread which owns the entry is also stored as part of the
 
 The value \texttt{v} in an \texttt{Entry} is maintained within the
 \texttt{(Maybe (IORef v))} field of the entry datatype.
-The \texttt{Maybe} datatype allows an empty entry to be represented.
+The main purpose of using the \texttt{Maybe} datatype is it allows an empty entry
+to be represented.
 Empty entries are created when entries are dropped from one ownership monad's
 context.  This allows the Glasgow Haskell Compiler to know that
 the runtime memory storing the prior value in an entry can be freed.
@@ -246,12 +247,14 @@ Internally the value stored in a non-empty entry is placed in an \texttt{IORef}.
 An \texttt{IORef} in Haskell is a mutable reference in the IO monad - an IO
 reference.
 The ownership monad uses entries to store the values assigned to owned
-references. One of the primary motivations for using the ownership monad
-is as a safer way to introduce mutability into a Haskell program.
-The values in entries are mutable but they are encased in the ownership system
-types which control access to the resource.
+references.
+Even though the values in entries are mutable because of the internal \texttt{IORef}
+implementation, they are encased in the ownership system types which control
+access to the value.
+One of the primary motivations for using the ownership monad by itself is as a
+safer way to introduce mutability, when it is needed, into a Haskell program.
 This will be discussed later on when talking about operations for working with
-owned references.
+owned references and using the ownership monad.
 
 
 \section{The Ownership System}
@@ -262,19 +265,24 @@ underlying resource.  In the library these variables are called ORef's
 or \textit{Owned References}.
 
 The type of an \texttt{ORef} is a thin wrapper around a way to tag and identify
-resources.
+resources stored in entries.
 
 \begin{verbatim}
 newtype ORef a = ORef {getID :: ID}
 \end{verbatim}
 
-% TODO add explanation of the phantom type a and why it is needed.
-% TODO change this to reflect the newtype instead
-An \texttt{ORef} is a parameterized abstract data type.
+An \texttt{ORef} is a parameterized abstract data type. Because there is only
+one constructor and one field associated with this datatype it is possible to
+use newtype to eliminate some of the runtime overhead.
+
+A phantom type is used to add a type variable to each \texttt{ORef}. This
+increases the type safety of the code by requiring that a type be embedded
+with each \texttt{ORef} even though the type variable will not be used on the
+right side of the definition.  This prevents references of different types
+from being mixed by creating a type error at compile time.
 The polymorphic \texttt{a} allows any type to be stored in an \texttt{ORef}.
 This datatype serves to provide a handle on each resource for the \texttt{Own}
 monad to use as it enforces ownership typing rules and tracks each resource.
-
 
 When the operations inside that monad are complete the references
 will no longer exist and the resources will be marked as free.
@@ -283,11 +291,11 @@ will no longer exist and the resources will be marked as free.
 % (can be automatically destroy and freed)
 % Explain that ORef's are dropped once the monad is finished evaluating - and we
 % know they can be dropped then.
-The information inside of the resource which is bound to the owned reference can
+The information inside the resource which is bound to the owned reference can
 only be accessed by the provided operations for references within the ownership
 monad.
 
-These operations which act on owned references will verify whether the ownership
+The operations which act on owned references will verify whether the ownership
 rules are being followed and prevent violations.  There are operations to create
 owned references, copy them, move the resource from one reference to another,
 drop a reference from the scope, and write a value to a reference.  There are
