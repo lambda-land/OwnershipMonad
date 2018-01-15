@@ -179,6 +179,8 @@ The type of the ownership monad:
 type Own a = StateT (ID,Store) (EitherT String IO) a
 \end{verbatim}
 
+% TODO explain EitherT as well as IO
+
 State is represented using the \texttt{StateT} monad transformer.
 The ownership monad needs to track the state of ownership system operations
 that occur within its context but it does not need to be aware of the
@@ -195,21 +197,43 @@ data Entry =
   forall v. Typeable v => Entry Flag ThreadId (Maybe (IORef v))
 \end{verbatim}
 
-% TODO explain the forall v.
-% TOOD also explain typeable in Entry
+The first notable parts of the \texttt{Entry} datatype are the explicitly
+quantified \texttt{forall v} along with the \texttt{Typeable} typeclass
+constraint on the type variable \texttt{v}.
+The combination of these allows for the references in the state to be
+heterogeneous.
+Otherwise it would be necessary to limit the \texttt{Store} to owned
+references of only one type per monadic state.
+Using the \texttt{Typeable} typeclass does require that values in each entry are
+\texttt{cast} in a type-cast operation.  However this is handled internally
+by the library when values are retrieved from an entry.
+The \texttt{cast} function reifies the generic type \texttt{v} into a real
+type.
+Doing so is necessary because it allows the value inside an entry to be used
+as a concrete type rather than a polymorphic value.
+
+Using the existentially quantified \texttt{forall v} also provides the
+ancillary benefit that the \texttt{Entry} datatype does not need a type
+variable.
+As a result the \texttt{Store} type does not need to be a parameterized abstract
+data type and can instead be a simple mapping between an integer ID and an entry.
+
+\begin{verbatim}
+type Store = IntMap Entry
+\end{verbatim}
 
 Each owned reference \texttt{Entry} maintains a \texttt{Flag} to indicate the
 level of access currently allowed by the ownership monad on the entry's value.
 % TODO explain what each of these are.
-
-The ID of the thread which owns the entry is also stored as part of the
-\texttt{Entry} datatype. 
 
 \begin{verbatim}
 data Flag = Locked
           | Readable
           | Writable
 \end{verbatim}
+
+The ID of the thread which owns the entry is also stored as part of the
+\texttt{Entry} datatype. 
 
 The value \texttt{v} in an \texttt{Entry} is maintained within the
 \texttt{(Maybe (IORef v))} field of the entry datatype.
@@ -238,13 +262,14 @@ underlying resource.  In the library these variables are called ORef's
 or \textit{Owned References}.
 
 The type of an \texttt{ORef} is a thin wrapper around a way to tag and identify
-resources. 
+resources.
 
 \begin{verbatim}
 newtype ORef a = ORef {getID :: ID}
 \end{verbatim}
 
 % TODO add explanation of the phantom type a and why it is needed.
+% TODO change this to reflect the newtype instead
 An \texttt{ORef} is a parameterized abstract data type.
 The polymorphic \texttt{a} allows any type to be stored in an \texttt{ORef}.
 This datatype serves to provide a handle on each resource for the \texttt{Own}
@@ -263,11 +288,12 @@ only be accessed by the provided operations for references within the ownership
 monad.
 
 These operations which act on owned references will verify whether the ownership
-rules are being followed and prevent violations. There are operations to create
+rules are being followed and prevent violations.  There are operations to create
 owned references, copy them, move the resource from one reference to another,
-drop a reference from the scope, and write a value to a reference. There are
-also operations for borrowing the resource inside a reference. This allows
-for a function to temporarily use the resource without taking ownership over it.
+drop a reference from the scope, and write a value to a reference.  There are
+also operations for borrowing the resource inside a reference. This allows for a
+function to temporarily use the resource without taking ownership over it.
+
 
 \subsection{Reference Creation}
 

@@ -38,6 +38,10 @@ import Data.Typeable (Typeable, cast)
 import Data.IORef (IORef, newIORef, readIORef)
 import Data.IntMap (IntMap, empty, lookup, insert, adjust)
 
+
+-- | Each ORef has a unique ID.
+type ID = Int
+
 -- | A typed reference to an owned value.
 --
 -- An ORef has a phantom type to ensure that the types of ORef are the same.
@@ -50,15 +54,7 @@ import Data.IntMap (IntMap, empty, lookup, insert, adjust)
 -- (through their ID) and what the type of the underlying resource is.
 newtype ORef a = ORef {getID :: ID}
 
--- | Ownership Monad with IO in the transformers stack
-type Own a = StateT (ID,Store) (EitherT String IO) a
-
--- | Each ORef has a unique ID.
-type ID = Int
-
--- | Store that maps IDs to entries.
-type Store = IntMap Entry
-
+-- | The flag for entries
 data Flag = Locked
           | Readable
           | Writable
@@ -75,6 +71,13 @@ data Flag = Locked
 --
 data Entry =
   forall v. Typeable v => Entry Flag ThreadId (Maybe (IORef v))
+
+-- | Store that maps IDs to entries.
+type Store = IntMap Entry
+
+-- | Ownership Monad with IO in the transformers stack
+type Own a = StateT (ID,Store) (EitherT String IO) a
+
 
 -- | The flag of an entry.
 flag :: Entry -> Flag
