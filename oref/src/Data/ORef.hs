@@ -104,8 +104,6 @@ moveORef oldORef = do
       True -> do
         new <- copyORef oldORef
         dropORef oldORef
-        -- if we cared about memory we would want to garbage collect/delete instead
-        -- of just dropping it from the context
         return new
 
 -- | Move the contents of one ORef to an existing ORef.
@@ -137,7 +135,7 @@ writeORef oref a = do
     ok <- checkORef oref -- check if the ORef can be read and written to
     case ok of
       False -> lift $
-        left "Error during write operation - checking if the entry\
+        left "Error during write operation. Checking if the entry\
              \ could be written to or if it was in the same thread\
              \ returned False."
       True -> setValue oref a
