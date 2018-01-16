@@ -737,6 +737,18 @@ This operation can conceptually be thought of as the combination of two
 although these \texttt{ORef} operations are hidden from the user of the
 \texttt{OChan} library.
 
+\begin{verbatim}
+writeOChan :: Typeable a => Chan a -> ORef a -> Own ()
+writeOChan ch oref = do
+  borrowORef oref (\v -> liftIO $ writeChan ch v)
+  dropORef oref
+\end{verbatim}
+
+\begin{verbatim}
+writeOChan' :: Typeable a => OChan a -> ORef a -> Own ()
+writeOChan' ch oref = ch >>= (\x -> writeOChan x oref)
+\end{verbatim}
+
 To write an \texttt{ORef} to a Channel, the owned channel operation
 needs to use the value that the owned reference refers to.  This means
 that before any further operations can occur the \texttt{ORef} must not have any
@@ -780,6 +792,18 @@ writing to an owned channel.  Rather than take the contents of an
 resource to a channel - we are taking ownership of a resource from the channel
 and encapsulating it within a new \texttt{ORef}.
 
+\begin{verbatim}
+readOChan :: Typeable a => Chan a -> Own (ORef a)
+readOChan ch = do
+  v <- liftIO $ readChan ch
+  newORef v
+\end{verbatim}
+
+\begin{verbatim}
+readOChan' :: Typeable a => OChan a -> Own (ORef a)
+readOChan' oc = oc >>= readOChan
+\end{verbatim}
+
 The first \texttt{ORef} operation inside a read from an owned channel
 is to read from the traditional channel inside the owned channel. This
 retrieves the resource from the channel and will prevent other threads from
@@ -800,6 +824,13 @@ ownership monad.
 Creating an owned channel, comparatively, is a very simple operation.
 A traditional channel is created through an \texttt{IO} operation and placed
 within the ownership monad.
+
+\begin{verbatim}
+newOChan :: OChan a
+newOChan = do
+  ch <- liftIO newChan
+  return ch
+\end{verbatim}
 
 It should be noted that there are write and read functions provided
 in the \texttt{OChan} library that can operate on normal \texttt{IO} bound

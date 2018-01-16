@@ -39,8 +39,7 @@ writeOChan ch oref = do
 -- This will consume the ORef and it will not be able
 -- to be used in the former Ownership context.
 writeOChan' :: Typeable a => OChan a -> ORef a -> Own ()
-writeOChan' ch oref = do
-  (ch >>= (\x -> writeOChan x oref))
+writeOChan' ch oref = ch >>= (\x -> writeOChan x oref)
 
 -- | Read the contents of a channel in to an Owned context
 --
@@ -56,5 +55,4 @@ readOChan ch = do
 -- This will take ownership of the value in the channel and bring it into the
 -- context of the current Ownership monad.
 readOChan' :: Typeable a => OChan a -> Own (ORef a)
-readOChan' oc = do
-  oc >>= readOChan
+readOChan' oc = oc >>= readOChan
