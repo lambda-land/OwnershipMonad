@@ -389,7 +389,7 @@ ID's to entries. Doing so allows the ownership system to determine if an ORef
 has been dropped or if it never existed.
 The resource space inside the entry of a dropped reference can be freed since
 the Haskell runtime will garbage collect the previous value that has now been
-set to the \texttt{Nothing} case since it will no longer be used.
+set to the \texttt{Nothing} case.
 
 \subsection{Copying a Reference}
 
@@ -404,7 +404,7 @@ copyORef :: ORef a -> Own (ORef a)
 copyORef oref = do
     (new, store) <- get
     entry <- getEntry oref
-    ok <- liftIO $ inThreadAndReadable entry
+    ok <- inThreadAndReadable oref
     case ok of
       False -> lift $ left "Error during copy operation"
       True -> do
@@ -417,21 +417,31 @@ The \texttt{copyORef} operation checks for an ownership system violation when
 it is run.
 A copy can be made if the underlying owned reference is at least readable and
 is in the same thread as the copy operation.
-To perfom a thread ID check the \texttt{inThreadAndReadable} function
+To perform a thread ID check the \texttt{inThreadAndReadable} function
 needs to be lifted from the \texttt{IO} monad.
 The \texttt{inThreadAndReadable} function will return true if the owned reference
 is at least readable and in the same thread.
 
-When an owned reference is readable that signals that there may be other
-operations using the resource but doing so in a way that is immutable.
+\begin{verbatim}
+inThreadAndReadable :: ORef a-> Own Bool
+inThreadAndReadable oref = do
+  entry@(Entry _f thrId _v) <- getEntry oref
+  liftIO $ do
+    threadId <- myThreadId
+    return $ (threadId == thrId) && readable entry
+\end{verbatim}
+
+An owned reference which is set to readable signals that there may be other
+operations using the resource in a way that is immutable.
 If an ORef is writable this indicates that no function is currently using the
-resource in a borrow operation in a way that may mutate the value stored in the
-owned reference.
+resource in a way that may mutate the value.
 
 If the copy operation is able to occur the new owned reference is inserted into
-the store for that monad. The new owned reference is set as writable even if
-the reference it was copied from was not.
+the store for that monad.  The new owned reference created from the copy
+operation is set as writable. This is the case even if the original reference
+the new reference was copied from was only able to be read from.
 
+% Move to related work?
 For those familiar with the terminology from the Rust programming language, the
 term \textit{copy} here is not the same as a copy in Rust. Rust makes a special
 distinction between making a copy of resources that are fixed in size

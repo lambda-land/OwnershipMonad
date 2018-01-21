@@ -120,11 +120,13 @@ entryIsEmpty :: Entry -> Bool
 entryIsEmpty (Entry _f _thrId Nothing)  = True
 entryIsEmpty (Entry _f _thrId (Just _)) = False
 
--- | Check if an Entry can be read and if it is in the same thread.
-inThreadAndReadable :: Entry -> IO Bool
-inThreadAndReadable entry@(Entry _f thrId _v) = do
-  threadId <- myThreadId
-  return $ (threadId == thrId) && readable entry
+-- | Check if an ORef can be read and if it is in the same thread.
+inThreadAndReadable :: ORef a-> Own Bool
+inThreadAndReadable oref = do
+  entry@(Entry _f thrId _v) <- getEntry oref
+  liftIO $ do
+    threadId <- myThreadId
+    return $ (threadId == thrId) && readable entry
 
 -- | Check if the ORef is able to be read and written to.
 --

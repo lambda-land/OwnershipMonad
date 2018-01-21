@@ -80,7 +80,7 @@ copyORef :: ORef a -> Own (ORef a)
 copyORef oref = do
     (new, store) <- get
     entry <- getEntry oref
-    ok <- liftIO $ inThreadAndReadable entry
+    ok <- inThreadAndReadable oref
     case ok of
       False -> lift $ left "Error during copy operation"
       True -> do
