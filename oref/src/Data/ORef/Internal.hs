@@ -126,18 +126,6 @@ inThreadAndReadable entry@(Entry _f thrId _v) = do
   threadId <- myThreadId
   return $ (threadId == thrId) && readable entry
 
--- | Check if the entry is able to be read and written to.
---
--- This will also check if the thread ID of the current thread matches the
--- thread specified in the Entry.
---
--- Checking the thread is done to prevent a child from using ORef's that it
--- inherited from its parent but was not explicitely given.
-checkEntry :: Entry -> IO Bool
-checkEntry entry@(Entry _f thrId _v) = do
-  threadId <- myThreadId
-  return $ (threadId == thrId) && writable entry
-
 -- | Check if the ORef is able to be read and written to.
 --
 -- This will also check if the thread ID of the current thread matches the
@@ -147,10 +135,11 @@ checkEntry entry@(Entry _f thrId _v) = do
 -- inherited from its parent but was not explicitely given.
 checkORef :: ORef a -> Own Bool
 checkORef oref  = do
-  entry <- getEntry oref
-  ok <- liftIO $ checkEntry entry
-  return ok
--- TODO should this also include if the ORef Entry is an empty Nothing value?
+  entry@(Entry _f thrId _v) <- getEntry oref
+  liftIO $ do
+    threadId <- myThreadId
+    return $ (threadId == thrId) && writable entry
+    -- TODO should this also include if the ORef Entry is an empty Nothing value?
 
 -- | The value inside the IORef of an entry casted to the expected type.
 --

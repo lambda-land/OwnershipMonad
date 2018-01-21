@@ -370,13 +370,23 @@ dropORef oref = do
 Any further operations that try to use the dropped reference will be prevented
 from occurring.
 The reference must be in the same thread as the drop operation and the owned
-reference must have a \texttt{Writable} flag.
+reference must have a \texttt{Writable} flag. These two conditions are checked
+by the \texttt{checkORef} helper function.
+
+\begin{verbatim}
+checkORef :: ORef a -> Own Bool
+checkORef oref  = do
+  entry@(Entry _f thrId _v) <- getEntry oref
+  liftIO $ do
+    threadId <- myThreadId
+    return $ (threadId == thrId) && writable entry
+\end{verbatim}
 
 If the ownership system rules are not being violated then the ORef will be
 dropped by having it's flag set to \texttt{Locked} and the value in the
 entry set to \texttt{Nothing}. The entry is not deleted from the mapping of
-ID's to entries. It is useful to know that if an ORef has been dropped and
-if it never existed. % TODO add more to this. Explain the different error?
+ID's to entries. Doing so allows the ownership system to determine if an ORef
+has been dropped or if it never existed.
 The resource space inside the entry of a dropped reference can be freed since
 the Haskell runtime will garbage collect the previous value that has now been
 set to the \texttt{Nothing} case since it will no longer be used.
