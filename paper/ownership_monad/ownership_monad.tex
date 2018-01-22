@@ -259,10 +259,24 @@ owned references and using the ownership monad.
 
 \section{The Ownership System}
 
-Resources are bound to a variable once they are created inside the ownership
-monad.  These variables are the mechanism to access - or refer to - the
-underlying resource.  In the library these variables are called ORef's
-or \textit{Owned References}.
+Apart from ownership monad type \texttt{Own}, the internal data structures
+discussed so far have been part of the implementation and would be invisible to
+the user of the library.
+From the perspective of the library user: owned references are abstract
+data types defined by the operations which can act on references in the
+ownership monad.
+The semantics of how owned references exist and operate correspond to the
+outcomes of using these operations.
+The functions to perform operations are made available in the public facing API
+module of the library for this implementation.
+
+\subsection{Owned References}
+
+Owned references represent variables which provide both the symbolic entity
+which owns a resources as well as the mechanism to access the underlying resource.
+Resources are bound to a variable when they are created inside the ownership
+monad. In the library implementation these variables are called ORef's or
+\textit{Owned References}.
 
 The type of an \texttt{ORef} is a thin wrapper around a way to tag and identify
 resources stored in entries.
@@ -277,38 +291,40 @@ use newtype to eliminate some of the runtime overhead.
 
 A phantom type is used to add a type variable to each \texttt{ORef}. This
 increases the type safety of the code by requiring that a type be embedded
-with each \texttt{ORef} even though the type variable will not be used on the
-right side of the definition.  This prevents references of different types
-from being mixed by creating a type error at compile time.
+with each \texttt{ORef}.
+This prevents references of different types from being mixed by invoking a
+type error at compile time.
 The polymorphic \texttt{a} allows any type to be stored in an \texttt{ORef}.
-This datatype serves to provide a handle on each resource for the \texttt{Own}
-monad to use as it enforces ownership typing rules and tracks each resource.
+This \texttt{ORef} datatype primarily serves to provide a handle on each
+resource for the ownership monad to use as it enforces ownership typing rules
+and tracks each resource.
 
-When the operations inside that monad are complete the references
-will no longer exist and the resources will be marked as free.
+When the operations inside an ownership monad are complete the references
+will no longer exist and the resources associated with each one will be marked
+as free.
 % TODO this is actually quite significant and worth explaining more because it
 % allows us to determine when a resource no longer needs to exist.
 % (can be automatically destroy and freed)
 % Explain that ORef's are dropped once the monad is finished evaluating - and we
 % know they can be dropped then.
-The information inside the resource which is bound to the owned reference can
-only be accessed by the provided operations for references within the ownership
-monad.
-
+The information inside the resource can only be accessed by the provided
+operations for references within the ownership monad.
 The operations which act on owned references will verify whether the ownership
-rules are being followed and prevent violations.  There are operations to create
-owned references, copy them, move the resource from one reference to another,
-drop a reference from the scope, and write a value to a reference.  There are
-also operations for borrowing the resource inside a reference. This allows for a
-function to temporarily use the resource without taking ownership over it.
+rules are being followed and detect violations.
 
+Operations create owned references, copy them, move the resource from one
+reference to another, drop a reference from the scope, and write a value to a
+reference.
+There are also operations for borrowing the resource inside a reference.
+This allows for a function to temporarily use the resource without taking
+ownership over it.
 
 \subsection{Reference Creation}
 
 The \texttt{newORef} function creates a new owned reference
 within the ownership monad and places the value provided to the function
 inside the reference. This value is internally stored within an \texttt{IORef}
-in the \texttt{Entry} dataype.
+in the \texttt{Entry} datatype.
 
 \begin{verbatim}
 newORef :: Typeable a => a -> Own (ORef a)
@@ -662,9 +678,9 @@ readORef oref = borrowORef oref return
 \end{verbatim}
 
 
-\section{ORef's}
+% \section{ORef's}
 
-TODO ORef's example section
+% TODO ORef's example section
 
 
 \chapter{Owned Channels}
