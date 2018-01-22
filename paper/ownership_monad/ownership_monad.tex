@@ -315,7 +315,7 @@ rules are being followed and detect violations.
 Operations create owned references, copy them, move the resource from one
 reference to another, drop a reference from the scope, and write a value to a
 reference.
-Additionally there are ooperations for borrowing the resource inside a reference.
+Additionally there are operations for borrowing the resource inside a reference.
 Borrowing allows a function to temporarily use the resource without taking
 ownership over it.
 
@@ -789,7 +789,7 @@ facilitate the transfer of resource ownership between threads.
 Beyond keeping track of this inter-thread ownership information - which is
 facilitated by the owned channel operations - each thread will be able
 to govern its own resources.  This prevents any accidental shared ownership of
-a resource from occurrin. It also does so without having to resort to using an
+a resource from occurring. It also does so without having to resort to using an
 additional form of communication between the threads or a resource scheduler and
 additional overhead. 
 
