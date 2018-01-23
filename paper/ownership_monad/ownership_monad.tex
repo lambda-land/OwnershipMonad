@@ -82,6 +82,12 @@ main = do
   putStrLn val
 \end{verbatim}
 
+Here the \texttt{forkIO} function takes an expression of type \texttt{IO ()}
+and executes it in a new thread.
+% It returns the thread ID of the new child thread but this is discarded with an
+% underscore \texttt{_}.
+This new thread will run concurrently with the original parent thread.
+
 This creates a clear race condition between the two threads and the mutable
 contents of the \texttt{IORef} shared between them. Both threads have access
 to the same \texttt{IORef} and it could be unclear which will access the
