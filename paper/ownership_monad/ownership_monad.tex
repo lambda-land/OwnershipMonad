@@ -165,15 +165,58 @@ with a set of rules similar to affine types.
 
 \section{Uniqueness Types}
 
-Idris, which treats Uniqueness Types as a subkind of regular Types, shows
-the other way of approaching this and the benefits and trade-offs of doing so.
+Idris, a dependently typed language, treats uniqueness types as a subkind of
+regular types. Uniqueness types in Idris are also inspired by ownership types
+and borrowed pointers in the Rust programming language, as well as Uniqueness
+Types in the Clean progamming language. % TODO add citation.
 
-% By allowing non-unique types to exist and be used along side Unique Types,
-% Idris offers a degree of flexibility with it's approach to Uniqueness
-% Typing that is not present with ours.
-% But idris is using it for something other than concurrency - TODO explain
+In Idris a value that has a type that is made up of a \texttt{UniqueType}
+will only be able to have at most one reference to it at run-time.
+% TODO add citation.
+To be able to do so, any value of a unique type has to be kept separate
+from normally typed values which have the type \texttt{Type}. %% TODO right?
 
+% TODO add expample here of uniqueness type in idris ??
 
+Idris allows for unique types to be read as long as the value is not
+updated. This means that a uniquely typed variable can be read in a function
+but the variable will not be able to be mutated (or used in a way which would
+mutate the underlying resource). To do this Idris creates a new kind of type
+from the unique type. This new type is called a \texttt{BorrowedType} and at
+the type level exists alongside \texttt{UniqueType} and \texttt{Type}.
+
+Idris treats a borrowed type as a kind of unique type but adds in additonal
+requirements and checks at the type level to ensure that the borrowed type
+will not mutate while it's resource is being read or inspected.  While this
+is occuring the internals will give exclusive acess to the resource and will
+prevent other functions or operations from mutating the resource.
+
+In Idris to convert a unique type into a borrow type uses the \texttt{Borrowed}
+dependent data type:
+
+\begin{verbatim}
+data Borrowed : UniqueType -> BorrowedType where
+     Read : {a : UniqueType} -> a -> Borrowed a
+
+implicit
+lend : {a : UniqueType} -> a -> Borrowed a
+lend x = Read x
+\end{verbatim}
+% TODO cite the Idris docs
+
+The \texttt{lend} can then be used by a \texttt{BorrowedType} in order
+to indicate that the underlying \texttt{UniqueType} variable being used
+should not be tracked as references to a unique value. This allows the
+borrowed variable to be used as many times as it needs to be instead
+of at most once. 
+
+% TODO give an example of this
+
+Variables of the borrowed type have a come with a drawback. Creating
+a borrowed type is way to lend a unique type in a way that does
+not change the underlying resource. This means that the resource inside
+a unique type can be read from and the information gleaned from doing so can be
+used but it does not allow the resource to mutate.
 
 
 \chapter{The Ownership Monad}
