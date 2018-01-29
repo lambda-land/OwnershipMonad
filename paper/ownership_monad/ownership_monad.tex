@@ -89,10 +89,14 @@ and executes it in a new thread.
 This new thread will run concurrently with the original parent thread.
 
 This creates a clear race condition between the two threads and the mutable
-contents of the \texttt{IORef} shared between them. Both threads have access
-to the same \texttt{IORef} and it could be unclear which will access the
-resource first. Under these conditions the issue is not only that we have
-shared mutable state but that we have shared access to that state.
+contents of the \texttt{IORef} shared between them.
+% TODO explain what an IORef is?
+% TODO explain the example more.
+Both threads have access to the same \texttt{IORef} and it could be unclear
+which will access the resource first. Under these conditions the issue is not
+only that we have shared mutable state but that we have shared access to that
+state.
+
 
 Immutable data structures simplify concurrency and are preferable to
 mutable structures. However categories of problems still exist where a
@@ -112,6 +116,7 @@ resource tracking.
 Affine type systems weaken the restrictions imposed by linear type systems.
 Instead of requiring every variable to be used exactly once - as is the case
 with linear types - every variable must be used at most once.
+% TODO rework this - add something here
 The language level Ownership typing in Rust has been directly inspired by Affine
 type systems. % TODO Add more here/ rework this sentence
 
@@ -154,6 +159,21 @@ with a set of rules similar to affine types.
 % increases our confidence and ability to know when a resource is finished being used.
 % refer to Edwin Brady quote at:
 % https://groups.google.com/d/msg/idris-lang/Z28F3MBBtTM/XOnUcrvsBAAJ
+
+
+\chapter{Related Works}
+
+\section{Uniqueness Types}
+
+Idris, which treats Uniqueness Types as a subkind of regular Types, shows
+the other way of approaching this and the benefits and trade-offs of doing so.
+
+% By allowing non-unique types to exist and be used along side Unique Types,
+% Idris offers a degree of flexibility with it's approach to Uniqueness
+% Typing that is not present with ours.
+% But idris is using it for something other than concurrency - TODO explain
+
+
 
 
 \chapter{The Ownership Monad}
@@ -994,17 +1014,6 @@ mutableOChanTest = do
 % How Ownership could be used for resources between processes using D-Bus and also
 % servers in distributed computing.
 
-\chapter{Related Works}
-
-\section{Uniqueness Types}
-
-Idris, which treats Uniqueness Types as a subkind of regular Types, shows
-the other way of approaching this and the benefits and trade-offs of doing so.
-
-% By allowing non-unique types to exist and be used along side Unique Types,
-% Idris offers a degree of flexibility with it's approach to Uniqueness
-% Typing that is not present with ours.
-% But idris is using it for something other than concurrency - TODO explain
 
 
 \chapter{Conclusion}
