@@ -161,38 +161,58 @@ with a set of rules similar to affine types.
 % https://groups.google.com/d/msg/idris-lang/Z28F3MBBtTM/XOnUcrvsBAAJ
 
 
-\chapter{Related Works}
+\chapter{Background}
 
 \section{Uniqueness Types}
 
 Idris, a dependently typed language, treats uniqueness types as a subkind of
 regular types. Uniqueness types in Idris are also inspired by ownership types
 and borrowed pointers in the Rust programming language, as well as Uniqueness
-Types in the Clean progamming language. % TODO add citation.
+Types in the Clean programming language. % TODO add citation.
 
 In Idris a value that has a type that is made up of a \texttt{UniqueType}
 will only be able to have at most one reference to it at run-time.
 % TODO add citation.
-To be able to do so, any value of a unique type has to be kept separate
-from normally typed values which have the type \texttt{Type}. %% TODO right?
+In order to make this guarantee, any value of a unique type is kept separate
+from normally typed values - which have the type \texttt{Type}.
 
-% TODO add expample here of uniqueness type in idris ??
+Polymorphic functions which take either unique types or regular
+types can exist.
+The type \texttt{Type*} is used to denote when a type which can either be a
+unique type or a regular type (but not both) may be used in a polymorphic
+function.
 
-Idris allows for unique types to be read as long as the value is not
-updated. This means that a uniquely typed variable can be read in a function
-but the variable will not be able to be mutated (or used in a way which would
-mutate the underlying resource). To do this Idris creates a new kind of type
-from the unique type. This new type is called a \texttt{BorrowedType} and at
+\begin{verbatim}
+head : {a : Type*} -> List a -> a
+\end{verbatim}
+
+A polymorphic function that takes either unique types or regular types will also
+have to obey the rules for how values that are uniquely typed can be used
+on the right hand side of a function.
+
+% TODO add example here of uniqueness type in idris ??
+
+Idris allows for unique typed variable to be used more than once on the right
+side of a function as long as they are being read and the value is not
+updated.
+This means that a uniquely typed variable can have its value inspected in a
+function and this will not count towards that variable being used.
+The variable will not be able to be mutated or used in any way which would
+mutate the underlying resource.
+
+To do this Idris creates a new kind of type from the unique type.
+This new type is called a \texttt{BorrowedType} and at
 the type level exists alongside \texttt{UniqueType} and \texttt{Type}.
 
-Idris treats a borrowed type as a kind of unique type but adds in additonal
+Idris treats a borrowed type as a different kind of type from unique types.
+Using a variable of the borrowed type adds in additional
 requirements and checks at the type level to ensure that the borrowed type
-will not mutate while it's resource is being read or inspected.  While this
-is occuring the internals will give exclusive acess to the resource and will
-prevent other functions or operations from mutating the resource.
+will not mutate while its resource is being read.
+While a borrow is occurring the internals will exclude other functions or
+operations from mutating the resource.
 
-In Idris to convert a unique type into a borrow type uses the \texttt{Borrowed}
-dependent data type:
+In Idris to convert a unique type into a borrow type the \texttt{Borrowed}
+dependent data type is used:
 
 \begin{verbatim}
 data Borrowed : UniqueType -> BorrowedType where
@@ -204,20 +224,61 @@ lend x = Read x
 \end{verbatim}
 % TODO cite the Idris docs
 
-The \texttt{lend} can then be used by a \texttt{BorrowedType} in order
-to indicate that the underlying \texttt{UniqueType} variable being used
-should not be tracked as references to a unique value. This allows the
-borrowed variable to be used as many times as it needs to be instead
-of at most once. 
+The \texttt{lend} function can then be invoked to create a \texttt{BorrowedType}.
+Doing so will indicate that while the underlying \texttt{UniqueType} variable is
+being used new references to it should not be tracked as additional references
+to a unique value.  This allows the borrowed variable to be used as many times
+as it needs to be instead of at most once. 
 
 % TODO give an example of this
 
-Variables of the borrowed type have a come with a drawback. Creating
-a borrowed type is way to lend a unique type in a way that does
-not change the underlying resource. This means that the resource inside
-a unique type can be read from and the information gleaned from doing so can be
-used but it does not allow the resource to mutate.
+\section{Ownership Types in Rust}
 
+A central feature of the Rust programming language is its ownership typing.
+The Rust language has inherent state and additionally all variables must obey the
+ownership rules. % TODO cite the Rust book ownership rules.
+These rules are checked at compile time and are enforced over
+all variables in a program.
+Doing so allows Rust to forgo a runtime system or a garbage collector.
+% TODO add citation for this
+
+In Rust, memory allocation is handled through the ownership system.
+When a resource is created and bound to a variable, such as \texttt{v1} in the
+example below, that variable is the \textit{owner} of the resource.
+
+\begin{verbatim}
+let v1 = vec![``Vector'', ``of'', ``Strings''];
+\end{verbatim}
+
+Ownership may be transferred to a different variable with a new assignment.
+The variable \texttt{v2} in the next example takes ownership over the
+vector which belonged to \texttt{v1}. 
+
+\begin{verbatim}
+let v2 = v1;
+\end{verbatim}
+
+Any attempts to access the values in the vector by referring to them through
+the old owner \texttt{v1} will result in a compile time error.
+When the variable which owns the resource goes out of scope at the end of a
+code block the resource will be freed.
+
+There may be situations in which one variable needs to temporarily
+use the resource owned by another variable without taking ownership over it.
+To do this a borrow of that variable is created:
+
+\begin{verbatim}
+let v1 = vec![``Vector'', ``of'', ``Strings''];
+let v2 = &v1;
+\end{verbatim}
+
+Ampersands are used to create references to the resources owned by other
+variables.
+In the last example the variable \texttt{v2} was instantiated as a borrow
+of the resource owned by \texttt{v1}.
+
+% TODO explain mutable borrows
+% Linear or Affine types
 
 \chapter{The Ownership Monad}
 
