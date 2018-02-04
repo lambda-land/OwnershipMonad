@@ -48,10 +48,12 @@ can be thought of as being interchangeable.
 Referential transparency is a desirable property which allows for a greater
 ability to reason about the behavior and correctness of a program.
 Even in a pure language like Haskell, this property breaks down in the context
-of concurrency.  In order to allow separate threads to communicate the basic
-mechanisms provided by Concurrent Haskell introduce mutable state.
-Adding mutable state and sharing it between threads explicitly introduces
-side-effects into otherwise pure and referentially transparent computations.
+of concurrency.
+% In order to allow separate threads to communicate the basic
+% mechanisms provided by Concurrent Haskell introduce mutable state.
+% Adding mutable state and sharing it between threads explicitly introduces
+% side-effects into otherwise pure and referentially transparent computations.
+% TODO change this portion
 Under these circumstances, Haskell's usual approach of segregating side-effects
 into monadic computations does not resolve every issue that can exist with
 shared-state concurrency.
@@ -97,28 +99,11 @@ which will access the resource first. Under these conditions the issue is not
 only that we have shared mutable state but that we have shared access to that
 state.
 
-
 Immutable data structures simplify concurrency and are preferable to
 mutable structures. However categories of problems still exist where a
 mutable structure is required.
+% TODO give some examples
 
-Linear types are often suggested as a possible solution to limit the issues that
-result from mutable state \cite{Wadler90lineartypes} and concurrency
-\cite{caires2010session}.  Language level support for linear types has been
-proposed for the Glasgow Haskell Compiler. \cite{LinearTypesGHC}
-% This would add plain linear types, directly inspired from linear logic.
-Ways to add linear types to Haskell without language level support have also
-been demonstrated using embedded domain specific languages within a monadic
-context. \cite{Paykin:2017:LM:3122955.3122965}
-
-Other less restrictive forms of logic have been used in type systems for similar
-resource tracking.
-Affine type systems weaken the restrictions imposed by linear type systems.
-Instead of requiring every variable to be used exactly once - as is the case
-with linear types - every variable must be used at most once.
-% TODO rework this - add something here
-The language level Ownership typing in Rust has been directly inspired by Affine
-type systems. % TODO Add more here/ rework this sentence
 
 \section{Contributions}
 
@@ -162,6 +147,27 @@ with a set of rules similar to affine types.
 
 
 \chapter{Background}
+
+\section{Linear and Affine Types}
+
+Linear types are often suggested as a possible solution to limit the issues that
+result from mutable state \cite{Wadler90lineartypes} and concurrency
+\cite{caires2010session}.  Language level support for linear types has been
+proposed for the Glasgow Haskell Compiler. \cite{LinearTypesGHC}
+% This would add plain linear types, directly inspired from linear logic.
+Ways to add linear types to Haskell without language level support have also
+been demonstrated using embedded domain specific languages within a monadic
+context. \cite{Paykin:2017:LM:3122955.3122965}
+
+Other less restrictive forms of logic have been used in type systems for similar
+resource tracking.
+Affine type systems weaken the restrictions imposed by linear type systems.
+Instead of requiring every variable to be used exactly once - as is the case
+with linear types - every variable must be used at most once.
+% TODO rework this - add something here
+The language level Ownership typing in Rust has been directly inspired by Affine
+type systems.
+% TODO Add more here/ rework this sentence
 
 \section{Uniqueness Types}
 
@@ -234,11 +240,15 @@ as it needs to be instead of at most once.
 
 \section{Ownership Types in Rust}
 
-A central feature of the Rust programming language is its ownership typing.
+A central feature of the Rust programming language is its use of an
+ownership-based type system. The ownership model used in Rust and the
+safety claims of using such a system have been formally proven and
+machine-checked in Coq \cite{Jung:2017:RSF:3177123.3158154}.
+
 The Rust language has inherent state and additionally all variables must obey the
 ownership rules. % TODO cite the Rust book ownership rules.
-These rules are checked at compile time and are enforced over
-all variables in a program.
+These rules are checked at compile time and are enforced over all variables in
+a program.
 Doing so allows Rust to forgo a runtime system or a garbage collector.
 % TODO add citation for this
 
@@ -278,7 +288,7 @@ In the last example the variable \texttt{v2} was instantiated as a borrow
 of the resource owned by \texttt{v1}.
 
 % TODO explain mutable borrows
-% Linear or Affine types
+
 
 \chapter{The Ownership Monad}
 
@@ -286,8 +296,8 @@ The term \textit{Ownership System} is used to describe the system for how
 resources are tracked and how they can be used once they are created. This
 system operates within the context of the ownership monad.
 The ownership system this library implements is inspired by
-ownership typing in Rust as well as Uniqueness Types
-from Idris.\cite{rust_book_ownership} \cite{idris_uniqueness_types}
+ownership typing in Rust \cite{rust_book_ownership}
+as well as Uniqueness Types from Idris \cite{idris_uniqueness_types}.
 % Restricting all entities to following the rules specified under an
 % affine typing system discipline is applied under the ownership typing system in
 % the Rust programming language. % TODO rework
@@ -298,7 +308,7 @@ cases.
 
 Uniqueness types in Idris, ownership typing in Rust, and the ownership system
 make use of the idea that by tracking resource use and applying rules to how
-resources are used - certain properties can be enforced.
+resources are used, certain properties can be enforced.
 % TODO Such as? Briefly what these are here
 
 \section{Implementation}
@@ -702,7 +712,8 @@ Instead of having to do these steps explicitly a value can be passed to a
 function as a borrowed value.  When a value is borrowed, the function will take
 a reference to that the value from the original owner and eventually the
 ownership of the resource will be handed back when the function returns.
-The Rust compiler which will track the borrows (with the borrow checker).
+The Rust compiler will track the borrows (with the borrow checker) statically at
+compile time.
 % TODO add citation
 
 Borrows in Rust come in two flavors - we can either lend a resource to many
