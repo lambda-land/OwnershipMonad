@@ -384,6 +384,27 @@ operations for references within the ownership monad.
 The operations which act on owned references will verify whether the ownership
 rules are being followed and detect violations.
 
+\subsection{Running the Ownership Monad}
+
+An ownership monad expression can be evaluated using the \texttt{startOwn}
+function. This will run the expression in an initially empty ownership context,
+one that does not have any existing owned references. 
+
+\begin{verbatim}
+startOwn :: Own a -> IO (Either String a)
+startOwn x = runEitherT (evalStateT x (0, empty))
+\end{verbatim}
+
+% TODO add example
+
+The \texttt{evalOwn} function can be used to evaluate an ownership computation
+with the initial context passed as an argument.
+
+\begin{verbatim}
+
+\end{verbatim}
+
+% TODO add example
 
 \subsection{Reference Creation}
 
@@ -869,44 +890,6 @@ references.
 Even though the values in entries are mutable because of the internal \texttt{IORef}
 implementation, they are encased in the ownership system types which control
 access to the value.
-
-\subsection{Running the Ownership Monad}
-
-An ownership monad expression can be evaluated using the \texttt{startOwn}
-function. This will run the expression in an initially empty ownership context,
-one that does not have any existing owned references. 
-
-\begin{verbatim}
-startOwn :: Own a -> IO (Either String a)
-startOwn x = runEitherT (evalStateT x (0, empty))
-\end{verbatim}
-
-% TODO add example
-
-The \texttt{continueOwn} function can be used to evaluate a nested ownership
-computation from within an existing ownership monad.  This will use the
-existing monad as the context to run the nested ownership computation. 
-
-\begin{verbatim}
-continueOwn :: Own a -> Own (Either String a)
-continueOwn x = do
-  s <- get
-  liftIO $ runEitherT (evalStateT x s)
-\end{verbatim}
-
-% TODO add example
-
-% The \texttt{evalOwn} function can be used to evaluate an ownership computation
-% with the initial context passed as an argument.
-
-% \begin{verbatim}
-% evalOwn :: Own a -> (ID,Store) -> IO (Either String a)
-% evalOwn actions startState =
-%   runEitherT (evalStateT actions startState)
-% \end{verbatim}
-
-
-% Explain EitherT and StateT ?
 
 
 % TODO ORef's example section
