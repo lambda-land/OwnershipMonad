@@ -308,6 +308,8 @@ Uniqueness types in Idris, ownership typing in Rust, and the ownership system in
 this report make use of the idea that by tracking resources and applying rules
 to how resources are used, certain properties can be enforced.
 % TODO Such as? Briefly what these are here
+One of the primary motivations for using the ownership monad is as a
+safer way to introduce mutability, when it is needed, into a Haskell program.
 
 
 \section{The Ownership System}
@@ -408,10 +410,10 @@ contains the value being stored as well as the state of the owned reference.
 Performing \texttt{get} will return the ID to use next as well as the current
 mapping of owned reference ID's and their entries.
 
-The thread ID of the thread which created the owned reference must
-be stored.  This is done in order to prevent child threads from using the owned
+The ID of the thread which created the owned reference must be stored.
+This is done in order to prevent child threads from using the owned
 references that were potentially inherited through the name-spacing scope of
-their parent threads.  The thread ID field of and entry is set when the owned
+their parent threads.  The thread ID field of the entry is set when the owned
 reference is initially created. This requires an \texttt{IO} operation to be
 performed in order to get the current thread ID of the thread creating the
 new \texttt{ORef}.
@@ -420,7 +422,7 @@ The entry that will be inserted into the new mapping will have a \texttt{Flag}
 which is set to \texttt{Writable}.
 The new store of entries, as well as the incremented ID, are put back into the
 state.
-The final step is to return the new \textit{ORef} so that it can be used by other
+The final step is to return the new \texttt{ORef} so that it can be used by other
 ownership operations.
 % Resources that are put into references can only have one owner at any given
 % time. The reference bound to the newly initialized resource becomes the sole
@@ -464,7 +466,7 @@ checkORef oref  = do
 
 If the ownership system rules are not being violated then the ORef will be
 dropped by having it's flag set to \texttt{Locked} and the value in the
-entry set to \texttt{Nothing}. The entry is not deleted from the mapping of
+entry set to \texttt{Nothing}. The entry is not deleted from the internal mapping of
 ID's to entries. Doing so allows the ownership system to determine if an ORef
 has been dropped or if it never existed.
 The resource space inside the entry of a dropped reference can be freed since
@@ -512,12 +514,12 @@ inThreadAndReadable oref = do
 \end{verbatim}
 
 An owned reference which is set to readable signals that there may be other
-operations using the resource in a way that is immutable.
+operations using the resource but in a way that is immutable.
 If an ORef is writable this indicates that no function is currently using the
 resource in a way that may mutate the value.
 
 If the copy operation is able to occur the new owned reference is inserted into
-the store for that monad.  The new owned reference created from the copy
+the internal store for that monad.  The new owned reference created from the copy
 operation is set as writable. The \texttt{setEntryWritable} function
 creates a duplicate entry with its flag set to writable.
 This action is performed even if the original reference was only
@@ -609,6 +611,7 @@ writeORef oref a = do
 
 The reference that is being changed cannot have any functions using the
 \texttt{ORef} and it must be in the same thread as the write operation.
+% TODO rework this sentence
 When the operation is performed the existing resource inside the ORef is over
 written by the new value.
 
@@ -767,10 +770,11 @@ after the read operation has completed.
 
 Reading from an \texttt{ORef} will reveal what the contents of the \texttt{ORef}
 was at the time the read was performed.  The \texttt{ORef} will continue to
-exist after the read operation and the value inside it may change.
-The advantage of using a read instead of a borrow is that it removes a copy of
-the resource from the \texttt{ORef}. This copy is freed from the restrictions
-imposed by the ownership system.
+exist after the read operation and the value inside the \texttt{ORef} may change.
+The advantage of using a read instead of a borrow is that the read operations
+removes a copy of the resource from the confines of the \texttt{ORef}.
+This copied value is therefore freed from the restrictions imposed on values
+contained inside references by the ownership system.
 
 \begin{verbatim}
 readORef :: Typeable a => ORef a -> Own a
@@ -780,9 +784,14 @@ readORef oref = borrowORef oref return
 
 \section{Internal Implementation}
 
-Apart from ownership monad type \texttt{Own}, the internal data structures
-in the implementation would be invisible to the user of the library.
-The type of the ownership monad itself is:
+The operations discussed so far which make up the public facing API are
+available to the user but the implementation of these functions is hidden.
+Apart from ownership monad type \texttt{Own},
+% TODO also mention the functions to run the monad
+the data structures and functions used in the implementation of the internal
+module would also be invisible to the user of the library. The first major
+piece of the internals is the ownership monad. The type of the ownership monad
+internally is:
 
 \begin{verbatim}
 type Own a = StateT (ID,Store) (EitherT String IO) a
@@ -821,7 +830,7 @@ type.
 Doing so is necessary because it allows the value inside an entry to be used
 as a concrete type rather than a polymorphic value.
 
-Using the existentially quantified \texttt{forall v} also provides the
+Using the existentially quantified \texttt{forall v} also produces the
 ancillary benefit that the \texttt{Entry} datatype does not need a type
 variable.
 As a result, the \texttt{Store} type does not need to be a parameterized abstract
@@ -848,22 +857,18 @@ The value \texttt{v} in an \texttt{Entry} is maintained within the
 \texttt{(Maybe (IORef v))} field of the entry datatype.
 The main purpose of using the \texttt{Maybe} datatype is it allows an empty entry
 to be represented.
-Empty entries are created when entries are dropped from one ownership monad's
+Empty entries result when entries are dropped from one ownership monad's
 context.  This allows the Glasgow Haskell Compiler to know that
 the runtime memory storing the prior value in an entry can be freed.
 
 Internally the value stored in a non-empty entry is placed in an \texttt{IORef}.
 An \texttt{IORef} in Haskell is a mutable reference in the IO monad - an IO
-reference.
+reference. %TODO change this sentence
 The ownership monad uses entries to store the values assigned to owned
 references.
 Even though the values in entries are mutable because of the internal \texttt{IORef}
 implementation, they are encased in the ownership system types which control
 access to the value.
-One of the primary motivations for using the ownership monad by itself is as a
-safer way to introduce mutability, when it is needed, into a Haskell program.
-This will be discussed later on when talking about operations for working with
-owned references and using the ownership monad.
 
 
 % TODO ORef's example section
