@@ -287,8 +287,28 @@ variables.
 In the last example the variable \texttt{v2} was instantiated as a borrow
 of the resource owned by \texttt{v1}.
 
-% TODO explain mutable borrows
+Borrows in Rust come in two flavors. We can either lend a resource to many
+borrowers as long as the borrowers never mutate the underlying resource or we
+can lend it to a single borrower that will be able to mutate the
+resource.\cite{rust_book_borrowing}
+It should be clear why giving multiple variables mutable access to
+the same resource could create data races which is why mutable borrows to
+multiple variables (or functions) are not allowed.
 
+A function in Rust depending on the type signature will either copy the value
+it is passed, take ownership of the value, or it will borrow the value - in
+which case ownership of the value is automatically returned when the function
+has finished execution.\cite{rust_book_ownership}
+A function in Rust that takes a borrowed value as an argument is
+syntactic sugar over that function first taking ownership of the value and then
+returning ownership over the value by placing it within the expression that is
+returned.
+Instead of having to do these steps explicitly a value can be passed to a
+function as a borrowed value.  When a value is borrowed, the function will take
+a reference to that the value from the original owner and eventually the
+ownership of the resource will be handed back when the function returns.
+The Rust compiler will track the borrows (with the borrow checker) statically at
+compile time.
 
 \chapter{The Ownership Monad}
 
@@ -597,9 +617,22 @@ of resources that are being copied.
 
 \subsection{Moving Ownership}
 
-A resource owned by a reference can also be transferred to a new reference or
-to an existing reference. After this operation is performed it will no longer
-be possible to refer to the underlying resource through the old reference. This
+It may be necessary to transfer a resource from one reference to another.
+Under these circumstances the old reference would need to be dropped after
+the resource has been transferred.
+Otherwise the old reference and new reference would be referring to the
+same resource. Here the resource owned by the reference \texttt{old} is
+transferred to the reference \texttt{new} and in the process the
+reference \texttt{old} is dropped:
+
+\begin{verbatim}
+new <- moveORef old
+\end{verbatim}
+
+A drop operation transfers a resource owned by one reference to a new reference or
+to an existing reference.
+After this operation is performed it will no longer be possible to refer to the
+underlying resource through the old reference. This
 operation removes the old reference from the scope of the ownership monad it
 previously existed in and the new reference is now the sole owner of the
 resource.
@@ -646,9 +679,20 @@ creates a situation where more than one reference owns a resource.
 
 \subsection{Writing to a Resource}
 
-A resource can be changed by its owner as long as it is writable.
+The write operation exists in order for a user to be able to write over the
+current value in an owned reference with a new value. This provides a way to
+safely mutate the contents of the reference while at the same time discarding
+it previous contents.
+
+\begin{verbatim}
+x <- newORef "Original contents"
+writeORef x "Some new contents"
+\end{verbatim}
+
 The value within the resource can be updated and changed through the reference
-that owns the resource. This operation can be performed safely because the usage
+that owns the resource.
+A resource can be changed by its owner as long as it is writable.
+This operation can be performed safely because the usage
 of the underlying resource is tracked by the ownership monad.
 
 \begin{verbatim}
@@ -671,44 +715,30 @@ written by the new value.
 
 \subsection{Borrowing a Resource}
 
-Borrowing a resource is the operation that allows a function to be able to use
-the contents of an owned reference.
-A resource can be used within the confines of the ownership monad by its owner
-and a function. This function will be required to remain in the
-context of the original ownership monad.
+Borrowing a resource is a library operation which allows a function to be able
+to use the contents of an owned reference.
+The function that is granted access to the resource will be required to remain
+in the context of the original ownership monad.
 
-% TODO move to related works section
+This can be used to lend out the contents of a reference temporarily to be
+able to inspect it in a print statement.  Doing so will let us refer to the
+contents with more than one reference since we will return to the original
+context.  While the resource is lent out other operations will be prevented
+from using the reference.
+
+\begin{verbatim}
+x <- newORef "Hello from inside the reference"
+let f :: String -> Own ()
+    f a = liftIO $ putStrLn $ "The contents of the ORef is: " ++ a
+_ <- borrowORef x g
+\end{verbatim}
+
 This operation is similar to passing a value to a function as a mutable
 borrow in the Rust language.
-To give some background on what this means:
-depending on the type signature a function in Rust will either copy the value
-it is passed, take ownership of the value, or it will borrow the value - in
-which case ownership of the value is automatically returned when the function
-has finished execution.\cite{rust_book_ownership}
-A function in Rust that takes a borrowed value as an argument is - in a way -
-syntactic sugar over that function first taking ownership of the value and then
-returning ownership over the value by placing it within the expression that is
-returned.
-Instead of having to do these steps explicitly a value can be passed to a
-function as a borrowed value.  When a value is borrowed, the function will take
-a reference to that the value from the original owner and eventually the
-ownership of the resource will be handed back when the function returns.
-The Rust compiler will track the borrows (with the borrow checker) statically at
-compile time.
-% TODO add citation
-
-Borrows in Rust come in two flavors - we can either lend a resource to many
-borrowers as long as the borrowers never mutate the underlying resource - or we
-can lend it to a single borrower that will be able to mutate the
-resource.\cite{rust_book_borrowing}
-It should be clear why giving multiple variables mutable access to
-the same resource could create data races which is why mutable borrows to
-multiple variables (or functions) are not allowed.
-
-This library takes a slightly different approach: instead of letting variables
-borrow a resource, a borrow operation instead lends the resource to a function
-which temporarily borrows the resource in order to use it and potentially mutate
-it in place.
+As we saw with the example this library takes a slightly different approach:
+instead of letting variables borrow a resource, a borrow operation instead lends
+the resource to a function which temporarily borrows the resource in order to
+use it and potentially mutate it in place.
 
 \begin{verbatim}
 borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
