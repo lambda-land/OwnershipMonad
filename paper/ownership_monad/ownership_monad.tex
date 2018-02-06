@@ -730,7 +730,7 @@ from using the reference.
 x <- newORef "Hello from inside the reference"
 let f :: String -> Own ()
     f a = liftIO $ putStrLn $ "The contents of the ORef is: " ++ a
-_ <- borrowORef x g
+_ <- borrowORef x f
 \end{verbatim}
 
 This operation is similar to passing a value to a function as a mutable
@@ -852,8 +852,13 @@ operation will take a snapshot of the current contents. The snapshot is returned
 but no guarantees can be made about the current contents of the \texttt{ORef}
 after the read operation has completed.
 
+\begin{verbatim}
+box <- newORef True
+schrodingers_cat_alive <- readORef box
+\end{verbatim}
+
 Reading from an \texttt{ORef} will reveal what the contents of the \texttt{ORef}
-was at the time the read was performed.  The \texttt{ORef} will continue to
+was at the time the read was performed but the \texttt{ORef} will continue to
 exist after the read operation and the value inside the \texttt{ORef} may change.
 The advantage of using a read instead of a borrow is that the read operations
 removes a copy of the resource from the confines of the \texttt{ORef}.
@@ -864,7 +869,6 @@ contained inside references by the ownership system.
 readORef :: Typeable a => ORef a -> Own a
 readORef oref = borrowORef oref return
 \end{verbatim}
-
 
 \section{Internal Implementation}
 
