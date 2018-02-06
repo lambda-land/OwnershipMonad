@@ -446,8 +446,20 @@ ownership operations.
 
 \subsection{Dropping an Owned Reference}
 
-The \textit{drop} operation will explicitly remove an owned reference from the
-ownership monad it previously existed in.
+Owned references can be removed from the context of the ownership monad.
+A user may want to explicitly remove a reference that is no longer needed but
+the ability to destroy an owned reference is also needed by other operations.
+
+A user can destroy an owned reference using the drop operation on the owned
+reference. For a reference \texttt{x} that already exists in the same context
+as the drop operation this can be done as follows:
+
+\begin{verbatim}
+dropORef x
+\end{verbatim}
+
+Here the \textit{drop} operation will explicitly remove an owned reference from
+the ownership monad it previously existed in.
 This will destroy the resource from the point of view of the other operations
 in that ownership context.
 
@@ -491,11 +503,37 @@ set to the \texttt{Nothing} case.
 
 \subsection{Copying a Reference}
 
-The underlying resource owned by a reference may be copied by other references
-if they are within the scope of the same ownership monad.  When this occurs a new
-reference is created and then given ownership over a copy of the resource.
-After a copy operation is performed the two references will each own what are now,
-essentially, two separate and different resources.
+A user may want to duplicate a reference in order to have two references
+that at one point were copies of each other. It is also useful to
+be able to do so to build larger abstractions with owned references.
+This would be trivial to do with regular variables but the ownership rules
+complicate the task for owned references.
+
+A simple assignment of a new reference to the old reference would mean that
+the two references were now referring to the same underlying resource. While
+it's possible to make a copy of a variable this way we would not be able to
+make any of the claims of resource use or safety.
+
+To create a new owned reference that is a copy of an existing reference
+there is the copy operation. For an owned reference \texttt{x} we can make
+a copy \texttt{y} using \texttt{copyORef} as follows:
+
+\begin{verbatim}
+y <- copyORef x
+\end{verbatim}
+
+This introduces the new reference \texttt{y} into the monadic context. Initially
+\texttt{y} is a copy of \texttt{x} but since the references are now separate
+entities they are able to diverge in terms of what their internal
+values are following the completion of the copy operation.
+
+The copy operation allows the underlying resource owned by a reference to be
+copied by other references if they are within the scope of the same ownership
+monad.
+When this occurs a new reference is created and then given ownership over a
+copy of the resource.
+After a copy operation is performed the two references will each own what are
+now two separate and different resources.
 
 \begin{verbatim}
 copyORef :: ORef a -> Own (ORef a)

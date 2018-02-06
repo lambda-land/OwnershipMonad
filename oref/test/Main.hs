@@ -52,6 +52,17 @@ copyORefExample = do
 evalCopyORefExample :: IO (Either String ())
 evalCopyORefExample = startOwn copyORefExample
 
+letTest :: Own ()
+letTest = do
+  ref <- newORef "hello"
+  let test = ref
+  _testCopy <- copyORef test
+  _copy <- copyORef ref
+  return ()
+
+evalLetTest :: IO (Either String ())
+evalLetTest = startOwn letTest
+
 -- | moveORef success test
 -- A simple test for the move operation that should pass.
 moveORefExample1 :: Own ()
@@ -295,6 +306,11 @@ main = do
   case test3 of
     Right () -> putStrLn "Test 3 passed"
     _ -> putStrLn " -- Test 3 failed -- "
+
+  let_test <- evalLetTest
+  case let_test of
+    Right _ -> putStrLn " -- Let Test failed -- "
+    _ -> putStrLn "Let Test passed"
 
   test4 <- evalMoveORefExample1
   case test4 of
