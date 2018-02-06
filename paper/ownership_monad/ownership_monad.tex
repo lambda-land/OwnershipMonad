@@ -362,7 +362,7 @@ one constructor and one field associated with this datatype it is possible to
 use newtype to eliminate some of the runtime overhead.
 
 A phantom type is used to add a type variable to each \texttt{ORef}. This
-increases the type safety of the code by requiring that a type be embedded
+ensures the type safety of the code by requiring that a type be embedded
 with each \texttt{ORef}.
 This prevents references of different types from being mixed by invoking a
 type error at compile time.
@@ -387,7 +387,23 @@ rules are being followed and detect violations.
 
 \subsection{Reference Creation}
 
-The \texttt{newORef} function creates a new owned reference
+References need to be introduced into the ownership monad in order to be used.
+To do this a library user would create a new reference and bind it with a
+resource.
+Both the instantiation of the new reference as well as the resource binding
+occur in the same step.
+A simple example of this is the creation of a reference \texttt{x} which is
+bound to the resource $\left[1,2,3\right]$.
+In the following code the owned reference \texttt{x} is created.
+The reference can now be used by other operations within the monad in which
+it resides.
+
+\begin{verbatim}
+x <- newORef [1,2,3]
+\end{verbatim}
+
+The \texttt{newORef} function is part of the user facing API of the library
+and. As the example has shown, this function creates a new owned reference
 within the ownership monad and places the value provided to the function
 inside the reference. This value is internally stored within an \texttt{IORef}
 in the \texttt{Entry} datatype.
