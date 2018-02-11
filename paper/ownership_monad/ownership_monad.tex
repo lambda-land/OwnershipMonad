@@ -1005,57 +1005,60 @@ continueOwn x = do
 \section{Introduction}
 
 \textit{Owned Channels} expand on the concept of using channels between threads
-to write to and read from a shared location.   As with traditional Channels,
+to write to and read from a shared location.   As with traditional channels,
 this location can be used by concurrent threads in order to share resources and
 to communicate.
 
-% Shared state brings with it all the dangers associated with it. REWORK
-% As our example shows - issues can crop up when resources are shared between
-% threads. % TODO add example
-
-Owned channels operate using the idea that instead of sending just the
-resource across a channel - send the ownership of the resource as well.
+Instead of sending the resource across a channel, owned channels
+send ownership of the resource as well.
 The key idea behind owned channels is for the thread sending a
 resource across a channel to relinquish ownership over the resource.
-A thread reading a resource from the channel automatically gains ownership over
-the resource it consumes from the channel.
+A thread reading a resource from the channel will automatically gain ownership
+over the resource it consumes from the channel.
 
-Once a thread has sent a resource over the channel - all operations in the thread
+Once a thread has sent a resource over the channel all operations in the thread
 will need to be prevented from using that resource.
-If the thread later needed to use the resource again it would have to read the
-resource from a channel and gain back ownership over the resource.
+If the thread later needed to use the resource again, it would have to read the
+resource from a channel and reclaim ownership over the resource.
 
-Traditionally the variable that was written to a channel would still exist in the
-scope of the code in the thread that originally wrote the resource to a channel.
+\subsection{Motivation}
+
+With traditional concurrent channels, the thread that originally wrote
+a resource to a channel would retain access to the resource. This is because the
+variable bound to the resource is still valid in the scope of the code which wrote
+to the channel.
+
 As a result it would be perfectly legal to write code that later referred to the
 resource through an existing variable binding in the original thread.
-% TODO refer to a code example for this
+Channels from the collection of concurrency abstractions available in the
+base libraries of Haskell do not track resource ownership as it shared
+between threads.
 In order to enforce which thread owns which resource, there would need to be
 some way to track not just what a resource is but also what variable (and what
 thread) owns a resource.
 
 \subsection{Using Owned References to Construct Owned Channels}
 
-As discussed earlier, owned references provide a fundamental set of
-rules generalizing resource ownership and how resources may be used within that
-context.  Within the ownership monad it is possible to use the
-resources in owned references safely knowing that any violations of
-the ownership rules will be caught and prevented.  For that reason
-owned references provide an useful building block for constructing
+As discussed earlier, the functions to operate on owned references enforce the
+rules generalizing resource ownership and how resources may be used within the
+context of the ownership monad.
+It is possible to use the resources in owned references safely knowing that any
+violations of the ownership rules will be detected and prevented.
+For that reason owned references provide a useful building block for constructing
 larger abstractions that are concerned with tracking resource ownership.
 
-The key to allowing multiple (potentially mutable) concurrent operations to occur
-on a shared resource is to make sure that they will not occur simultaneously.
-% TODO explain that this is not a new idea and refer to existing mutex locks and
-% so on?
+One such area of concern is how to enable expressions in separate
+threads to access the same resource.
+Multiple (potentially mutable) concurrent expressions can evaluate a shared
+resource as long as they do not do so simultaneously.
 As the chapter introduction alluded, one solution to this problem is to
-create a system for shared access to resources that tracks both who owns the
-resource in addition to what the resource is.
-Using owned references as a building block it is quite easy to build
-such a system. Additionally it is possible to do so on top of the existing
-Channel interface and the concurrency abstractions which Channels provide in
-Haskell.
+create a system for shared access to resources between channels which tracks
+both what the resource is and who can own the resource.
 
+Using owned references as a building block it is quite easy to create
+such a system.  Additionally it is possible to do so on top of the existing
+channel interface and the concurrency abstractions which the base libraries
+provide in Haskell.
 
 \section{Owned Channel Operations}
 
