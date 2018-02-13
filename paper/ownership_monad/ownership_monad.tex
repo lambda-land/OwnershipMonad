@@ -1091,7 +1091,9 @@ readOChan  :: Typeable a => OChan a -> Own (ORef a)
 The owned channel operations detect ownership violations and prevent the
 accidental shared ownership of a resource from occurring.
 This allow each thread to be able to acquire or give up ownership of resources
-in a safe manner.
+in a safe manner. The read and write operations will only allow the user to
+read or write references to the channel. Read and write operations are also
+restricted to the context of the ownership monad.
 
 \subsection{Writing to an Owned Channel}
 
@@ -1163,10 +1165,10 @@ when the previous borrow operation is complete.
   it is not entirely true to say that it does not have any borrowers - the
   subsequent drop operation however makes this irrelevant.}
 
-Because the \texttt{ORef} no longer has any functions using it is now possible to
-drop it from that monad using the \texttt{ORef} drop operation.  This will
-update the resource ledger for that monad - crucially without touching the
-resource itself.
+Because the \texttt{ORef} no longer has any functions using it, it is now
+possible to drop it from that monad using the \texttt{ORef} drop operation.
+This will update the resource ledger for that monad - crucially without
+touching the resource itself.
 % TODO this may no longer be true.
 % Drop operations now affect the IORef - but does this affect multithreaded
 % IORef's??
@@ -1185,38 +1187,40 @@ this the borrow operation is used within the write operation.
 
 \subsection{Reading from an Owned Channel}
 
-Reading from an owned channel can be thought of as the reverse of
-writing to an owned channel.  Rather than take the contents of an
-\texttt{ORef} and give away ownership of the resource inside it - by writing the
-resource to a channel - we are taking ownership of a resource from the channel
-and encapsulating it within a new \texttt{ORef}.
+Reading from an owned channel can be thought of as the reverse of writing to an
+owned channel.  Rather than take the contents of an \texttt{ORef} and give away
+ownership of the resource inside it
+- by writing the resource to a channel -
+we are instead taking ownership of a resource from the channel and encapsulating
+it within a new \texttt{ORef}.
 
 \begin{verbatim}
-readOChan :: Typeable a => Chan a -> Own (ORef a)
-readOChan ch = do
+readOChan :: Typeable a => OChan a -> Own (ORef a)
+readOChan oc = oc >>= readOChan
+\end{verbatim}
+
+A normal channel can be used with the \texttt{readOChan'} function because
+the reference which is read from the channel will. 
+
+\begin{verbatim}
+readOChan' :: Typeable a => Chan a -> Own (ORef a)
+readOChan' ch = do
   v <- liftIO $ readChan ch
   newORef v
 \end{verbatim}
 
-\begin{verbatim}
-readOChan' :: Typeable a => OChan a -> Own (ORef a)
-readOChan' oc = oc >>= readOChan
-\end{verbatim}
-
-The first \texttt{ORef} operation inside a read from an owned channel
-is to read from the traditional channel inside the owned channel. This
-retrieves the resource from the channel and will prevent other threads from
-reading it. This latter aspect leverages a previously existing aspect of
-Haskell Channels. % TODO cite
+Within the read operation a resource is first read from the traditional
+channel.
+This retrieves the resource from the channel and removes it from the channel
+which prevents other threads from then reading that resource.
 
 The second operation is to place the freshly acquired resource inside a new
 \texttt{ORef}.  This \texttt{ORef} will then be returned into the
-ownership monad context by the read operation on the
-owned channel.  The thread can now have access to the \texttt{ORef}
-and the value within it using the provided operations in the
-ownership monad.
+ownership monad context.
+The thread which performed the read operation will now have access to the
+\texttt{ORef} and will be able to manipulate the value inside it using the
+provided operations for owned references.
 
-% TODO add more on Reading
 
 \subsection{Creating an Owned Channel}
 
@@ -1231,12 +1235,14 @@ newOChan = do
   return ch
 \end{verbatim}
 
-It should be noted that there are write and read functions provided
+It was noted earlier that there are write and read functions provided
 in the \texttt{OChan} library that can operate on normal \texttt{IO} bound
-channels.  It is recommended to not use these and instead use write and read
-functions that only operate on owned channel to safeguard against
-accidentally trying to use the traditional channel write and read functions
-with \texttt{liftIO}.
+channels.  Using a regular channel in the ownership monad with the write and
+read operation for owned references provides the same ability to reason about
+resource use and detect violaions.
+% However using the write and read functions which only operate on owned channel
+% safeguard against accidentally trying to use the traditional channel write and
+% read functions with \texttt{liftIO}.
 
 \section{Detecting Race Conditions}
 
