@@ -150,10 +150,13 @@ with a set of rules similar to affine types.
 
 \section{Linear and Affine Types}
 
+A linear type system enforces the rule that resources are used exactly once.
 Linear types are often suggested as a possible solution to limit the issues that
 result from mutable state \cite{Wadler90lineartypes} and concurrency
-\cite{caires2010session}.  Language level support for linear types has been
-proposed for the Glasgow Haskell Compiler. \cite{LinearTypesGHC}
+\cite{caires2010session}.
+
+Language level support for linear types has been proposed for the Glasgow
+Haskell Compiler. \cite{LinearTypesGHC}
 % This would add plain linear types, directly inspired from linear logic.
 Ways to add linear types to Haskell without language level support have also
 been demonstrated using embedded domain specific languages within a monadic
@@ -167,7 +170,7 @@ with linear types - every variable must be used at most once.
 % TODO rework this - add something here
 The language level ownership typing in Rust has been directly inspired by affine
 type systems.
-% TODO Add more here/ rework this sentence
+
 
 \section{Uniqueness Types}
 
@@ -246,13 +249,20 @@ safety claims of using such a system have been formally proven and
 machine-checked in Coq \cite{Jung:2017:RSF:3177123.3158154}.
 
 The Rust language has inherent state and additionally all variables must obey the
-ownership rules. % TODO cite the Rust book ownership rules.
+ownership rules.
+% TODO cite the Rust book ownership rules.
 These rules are checked at compile time and are enforced over all variables in
 a program.
 Doing so allows Rust to forgo a runtime system or a garbage collector.
 % TODO add citation for this
 
 In Rust, memory allocation is handled through the ownership system.
+The ownership system is a language level abstraction which makes use of
+affine types for resource management.
+Additionally Rust uses \textit{lifetime} analysis of resource use for fast
+deallocation. Lifetimes in Rust are beyond the scope of this project report and
+in some ways are more similar to a linearly typed language than an affine one.
+
 When a resource is created and bound to a variable, such as \texttt{v1} in the
 example below, that variable is the \textit{owner} of the resource.
 
@@ -1313,9 +1323,29 @@ mutableOChanTest = do
 % servers in distributed computing.
 
 
-
 \chapter{Conclusion}
-\section{TODO}
+
+This project report has demonstrated a monadic library-based approach for
+tracking resources.
+Resource management done in this way allows a user to detect when a program
+tries to a use a resource with more than one referent.
+
+Other languages have approached resource management with similar
+solutions: notably language level support for ownership typing in Rust as well
+as uniqueness types in Idris which make use of Idris' dependent type system.
+This report has demonstrated how a similar approach to tracking resource use can be
+implemented in Haskell as a library.
+
+The library approach shows how a similar ability for reasoning about resource use
+can be attained without abstractions which require language level support for
+affine or linear types.
+While systems based on these approaches may provide more features for resource
+tracking, the resource tracking functionality defined in the ownership
+monad leverages existing language features and libraries in Haskell.
+
+This report has also shown that the operations presented with the ownership monad
+can be used to construct larger abstractions which concern themselves with
+resource use.
 
 \bibliographystyle{plain}
 \bibliography{ownership_monad}{}
