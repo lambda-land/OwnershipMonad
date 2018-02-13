@@ -27,7 +27,7 @@ singleThreadedWrite = do
   -- create a new channel
   let ch = newOChan
   -- write the oref to the channel -- this removes the oref from the context
-  writeOChan' ch ref
+  writeOChan ch ref
 
   writeORef ref "Odo"
   -- ^^ writing to a ref that's no longer owned
@@ -36,7 +36,7 @@ singleThreadedWrite = do
 -- threadTask :: Typeable a => (Chan a) -> IO ()
 -- threadTask ch = do
 --   ex <- (evalOwn $ do
---                _ <- readOChan ch
+--                _ <- readOChan' ch
 --                return ()
 --         )
 --   case ex of
@@ -55,13 +55,13 @@ chanTest = do
   -- write to it
   writeORef ref "Quark"
   -- write the oref to the channel (removing it from this context)
-  writeOChan ch ref
+  writeOChan' ch ref
   -- fork the thread
   _ <- liftIO $ forkIO $ do
     ex <- startOwn $ do
       -- we use startOwn here because we are in a new ownership context
       -- the child thread can read from the channel
-      _ <- readOChan ch
+      _ <- readOChan' ch
       -- this places ownership of the resource in the channel within the
       -- context of the child thread
       return ()
@@ -88,14 +88,14 @@ mutableOChanTest = do
   ref <- newORef ioref
 
   -- write the oref to the channel (removing it from this context)
-  writeOChan ch ref
+  writeOChan' ch ref
 
   -- fork the thread
   _ <- liftIO $ forkIO $ do
     ex <- startOwn $ do
       -- we use startOwn here because we are in a new ownership context
       -- the child thread can read from the channel
-      oref <- readOChan ch
+      oref <- readOChan' ch
       borrowORef
         oref
         (\x -> do
@@ -103,14 +103,14 @@ mutableOChanTest = do
         )
       -- this places ownership of the resource in the channel within the
       -- context of the child thread
-      writeOChan ch oref
+      writeOChan' ch oref
       return ()
     -- case ex of
     --   Left err -> do putStrLn ("Error in the child" ++ err)
     --   Right _ -> do putStrLn "Success in the child thread"
     return ()
 
-  oref' <- readOChan ch
+  oref' <- readOChan' ch
   borrowORef
     oref'
     (\x -> do
@@ -154,7 +154,7 @@ forkedWriteExample = do
   -- create a channel
   ch <- newOChan
   -- write the oref to the channel - therefore consuming the oref
-  writeOChan ch ref
+  writeOChan' ch ref
   return ()
 
 
@@ -169,7 +169,7 @@ forkedWriteExample = do
 
 -- worker :: OChan Int -> Int -> Own ()
 -- worker chan num = forever $ do
---     ref <- readOChan' chan
+--     ref <- readOChan chan
 --     s <- borrowORef ref (\x -> return x)
 --     liftIO $ say $ pack $ concat
 --         [ "Worker #"
@@ -183,7 +183,7 @@ forkedWriteExample = do
 --     chan <- newOChan
 --     liftIO $ concurrently
 --       (mapConcurrently (liftIO . (worker chan)) [1..5])
---       (mapM_ (writeOChan chan) [1..10])
+--       (mapM_ (writeOChan' chan) [1..10])
 --     return ()
 
 

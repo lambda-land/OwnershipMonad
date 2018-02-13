@@ -1062,85 +1062,110 @@ provide in Haskell.
 
 \section{Owned Channel Operations}
 
-A major idea that owned channels take advantage of is that ownership
-of resources - once granted - can be tracked and used in isolation. For that reason
-each thread can exist inside its own ownership monad bubble and
-remain isolated from the state of resources which exist in other threads.
-% TODO add diagram of Ownership Monad "bubbles"
-The act of giving up ownership  (on write operations) is enough information to
+The major idea that owned channels take advantage of is that ownership
+of resources can be tracked and used in isolation. Each ownership monad only
+needs to concern itself with the references that are in the scope of that monad.
+
+For that reason multiple threads can exist and each can have their own
+ownership monad without sacrificing the ability to reason about resource use.
+The resources available to each of these threads are covered by that thread's
+ownership monad.
+The act of giving up ownership (on write operations) is enough information to
 facilitate the transfer of resource ownership between threads.
 % TODO add example to back this up
 
-Beyond keeping track of this inter-thread ownership information - which is
-facilitated by the owned channel operations - each thread will be able
-to govern its own resources.  This prevents any accidental shared ownership of
-a resource from occurring. It also does so without having to resort to using an
-additional form of communication between the threads or a resource scheduler and
-additional overhead. 
+Owned channels are the abstraction built on top of the ownership monad which
+handle the inter-thread ownership information. The operations are intended
+to be similar to the channel operations from \texttt{Control.Concurrent.Chan}
+in the base libraries of Haskell. There are operations for creating an owned
+channel, writing to the owned channel and reading from an owned channel:
+
+\begin{verbatim}
+type OChan a = Own (Chan a)
+
+newOChan    :: OChan a
+writeOChan :: Typeable a => OChan a -> ORef a -> Own ()
+readOChan  :: Typeable a => OChan a -> Own (ORef a)
+\end{verbatim}
+
+The owned channel operations detect ownership violations and prevent the
+accidental shared ownership of a resource from occurring.
+This allow each thread to be able to acquire or give up ownership of resources
+in a safe manner.
 
 \subsection{Writing to an Owned Channel}
 
 Writing to an owned channel takes the contents of an \texttt{ORef} in
-one thread and writes it to the Channel - the shared state between the threads.
+one thread and writes it to the channel - the shared state between the threads.
 From the view-point of the thread that wrote to the channel this operation
 consumes the \texttt{ORef} and the thread loses the ability to further use the
 \texttt{ORef} in later operations.
 
-This operation is composed from the combination of two
+\begin{verbatim}
+writeOChan :: Typeable a => OChan a -> ORef a -> Own ()
+writeOChan ch oref = ch >>= (\x -> writeOChan x oref)
+\end{verbatim}
+
+The \texttt{writeOChan} function takes an owned channel and writes the
+resource to it. Because the owned reference only exists within the
+ownership monad it is not necessary for resource safety to use
+an \texttt{OChan} and a regular \texttt{Chan} type can be used in it's place
+if it is used in combination the \texttt{writeOChan'} function.
+Using an \texttt{OChan} with \texttt{writeOChan} saves the user
+from having to lift the regular channel out of the IO monad within their
+ownership monad expression and is provided for convenience.
+
+This write operation is composed from the combination of two
 \texttt{ORef} operations, a borrow followed by a drop operation, 
 although these \texttt{ORef} operations are hidden from the user of the
 \texttt{OChan} library.
 
 \begin{verbatim}
-writeOChan :: Typeable a => Chan a -> ORef a -> Own ()
-writeOChan ch oref = do
+writeOChan' :: Typeable a => Chan a -> ORef a -> Own ()
+writeOChan' ch oref = do
   borrowORef oref (\v -> liftIO $ writeChan ch v)
   dropORef oref
 \end{verbatim}
 
-\begin{verbatim}
-writeOChan' :: Typeable a => OChan a -> ORef a -> Own ()
-writeOChan' ch oref = ch >>= (\x -> writeOChan x oref)
-\end{verbatim}
-
-To write an \texttt{ORef} to a Channel, the owned channel operation
+To write an \texttt{ORef} to a channel, the owned channel operation
 needs to use the value that the owned reference refers to.  This means
 that before any further operations can occur the \texttt{ORef} must not have any
-functions currently borrowing its contents and it must exist within the context
-of that ownership monad.
+functions currently using its contents. The owned reference must exist within
+the context of the ownership monad as well.
 If those conditions are satisfied then the first of the two \texttt{ORef}
 operations can occur.
 
-In order to write the resource inside the \texttt{ORef} to a traditional Channel
-- inside the owned channel - the function writing the resource to the
-Channel needs to borrow the resource.
+In order to write the resource inside the \texttt{ORef} to a traditional
+channel, inside the owned channel, the function writing the resource to the
+channel needs to borrow the resource.
 This might seem odd since it would appear that the borrower function does not
 intend to ever return the resource.  This is accurate, the resource that was
-written to the channel will not be returned; under the rules for a
+written to the channel will not be returned and under the rules for a
 borrow this kind of use is actually allowed.
-There would not seem to be an issue if it were not for the fact that
-the borrower function acts on resources shared between threads.
 
-% Given the nature of concurrent operation between threads - doing
-% this step alone with the function to write to a channel - would be considered
-% dangerous.
-
-This is still occurring inside the larger owned channel write operation and will
+This step occurs inside the larger owned channel write operation and will
 be opaque to the user of the library.
+There would not seem to be an issue if it were not for the fact that
+the borrower function acts on resources shared between threads and different
+ownership monads.  Because the resource is being used in the borrow step in a
+way which sends it elsewhere it is a clear violation of the ownership rules and
+one which will not be caught. When the resource has been written to the channel
+it will also still exist in the original thread. This issue is resolved in the
+next operation which makes up writes to owned channels.
 
 The second \texttt{ORef} operation is to drop the \texttt{ORef} that was just
 borrowed. This immediately follows the completion of the borrow operation. The
-borrow operation used the underlying resource in order to send it to the channel
-and upon completion. As far as the ownership monad for that thread is
-concerned the \texttt{ORef} no longer has any functions borrowing the reference
+borrow operation used the underlying resource in order to send it to the channel.
+Upon completion, as far as the ownership monad for that thread is
+concerned, the \texttt{ORef} no longer has any functions using the reference
 when the previous borrow operation is complete.
 \footnote{Since the borrow just performed a dangerous multi-threaded IO operation
   it is not entirely true to say that it does not have any borrowers - the
   subsequent drop operation however makes this irrelevant.}
 
-Because the \texttt{ORef} no longer has any borrowers it is now possible to
+Because the \texttt{ORef} no longer has any functions using it is now possible to
 drop it from that monad using the \texttt{ORef} drop operation.  This will
-update the resource ledger for that monad crucially without touching the
+update the resource ledger for that monad - crucially without touching the
 resource itself.
 % TODO this may no longer be true.
 % Drop operations now affect the IORef - but does this affect multithreaded
@@ -1149,6 +1174,14 @@ resource itself.
 % This is worth testing though.
 This prevents any further operations from using the resource
 in that thread.
+
+The borrow operation on owned references is used instead of the read operation
+in order to ensure that the actual value in the owned reference is being used
+and sent across the channel. The read operation would report what the value
+was at the time of reading it but other functions could then mutate it
+in quick succession after the read is complete.
+A write operation should totally consume the resource and in order to ensure
+this the borrow operation is used within the write operation.
 
 \subsection{Reading from an Owned Channel}
 
