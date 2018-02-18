@@ -52,6 +52,17 @@ copyORefExample = do
 evalCopyORefExample :: IO (Either String ())
 evalCopyORefExample = startOwn copyORefExample
 
+-- Example from paper of references diverging after a copy operation
+divergingCopy = startOwn $ do
+  x <- newORef (1 :: Int)
+  y <- copyORef x
+  let f :: Int -> Own Int
+      f i = return (i+1)
+  borrowORef' x f
+  xContents <- readORef x
+  yContents <- readORef y
+  return (xContents, yContents)
+
 letTest :: Own ()
 letTest = do
   ref <- newORef "hello"

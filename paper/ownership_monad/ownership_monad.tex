@@ -508,10 +508,27 @@ dropORef oref = do
 \end{verbatim}
 
 Any further operations that try to use the dropped reference will be prevented
-from occurring.
-The reference must be in the same thread as the drop operation and the owned
-reference must have a \texttt{Writable} flag. These two conditions are checked
-by the \texttt{checkORef} helper function.
+from occurring:
+
+\begin{verbatim}
+startOwn $ do
+  ref <- newORef "hello"
+  dropORef ref
+  _copy <- copyORef ref
+  return ()
+\end{verbatim}
+
+The copy operation in this example expression will not create a copy of a
+dropeed reference.
+Instead, because of the earlier drop operation, the copy operation will cause
+this expression to evaluate to a \texttt{Left}
+value: \texttt{Left "Error during copy operation"}. 
+
+For a drop operation to occur the reference must be in the same thread as the
+drop operation and the owned reference must have a \texttt{Writable} flag.
+In the previous example the reference was writable prior to being dropped.
+These two conditions are internally checked by the \texttt{checkORef} helper
+function:
 
 \begin{verbatim}
 checkORef :: ORef a -> Own Bool
@@ -524,20 +541,25 @@ checkORef oref  = do
 
 If the ownership system rules are not being violated then the ORef will be
 dropped by having it's flag set to \texttt{Locked} and the value in the
-entry set to \texttt{Nothing}. The entry is not deleted from the internal mapping of
+entry set to \texttt{Nothing}.
+The entry is not deleted from the internal mapping of
 ID's to entries. Doing so allows the ownership system to determine if an ORef
 has been dropped or if it never existed.
+
 The resource space inside the entry of a dropped reference can be freed since
 the Haskell runtime will garbage collect the previous value that has now been
 set to the \texttt{Nothing} case.
+The ability to drop an owned reference from a context will be used later
+within larger abstractions.
+
 
 \subsection{Copying a Reference}
 
 A user may want to duplicate a reference in order to have two references
-that at one point were copies of each other. It is also useful to
-be able to do so to build larger abstractions with owned references.
+that at one point were copies of each other.
 This would be trivial to do with regular variables but the ownership rules
-complicate the task for owned references.
+which do not allow more than one binding to a resource complicate the task for
+owned references.
 
 A simple assignment of a new reference to the old reference would mean that
 the two references were now referring to the same underlying resource. While
@@ -557,6 +579,7 @@ This introduces the new reference \texttt{y} into the monadic context. Initially
 entities they are able to diverge in terms of what their internal
 values are following the completion of the copy operation.
 
+
 The copy operation allows the underlying resource owned by a reference to be
 copied by other references if they are within the scope of the same ownership
 monad.
@@ -564,6 +587,29 @@ When this occurs a new reference is created and then given ownership over a
 copy of the resource.
 After a copy operation is performed the two references will each own what are
 now two separate and different resources.
+
+This property can be observed when a reference is copied (creating another
+reference) and then the original reference is mutated:
+
+\begin{verbatim}
+startOwn $ do
+  x <- newORef (1 :: Int)
+  y <- copyORef x
+  let f :: Int -> Own Int
+      f i = return (i+1)
+  borrowORef' x f
+  xContents <- readORef x
+  yContents <- readORef y
+  return (xContents, yContents)
+\end{verbatim}
+
+This expression will evaluate to \texttt{Right (2,1)}.
+After the reference \texttt{y} was created by making a copy of
+reference \texttt{x}, the contents of reference \texttt{x}
+was mutated in a borrow operation (borrow operations will be explained in depth
+later in the report.)
+Because of this mutable action the contents inside the copy and the original
+reference diverged.
 
 \begin{verbatim}
 copyORef :: ORef a -> Own (ORef a)
@@ -579,8 +625,6 @@ copyORef oref = do
         return (ORef new)
 \end{verbatim}
 
-The \texttt{copyORef} operation checks for an ownership system violation when
-it is run.
 A copy can be made if the underlying owned reference is at least readable and
 is in the same thread as the copy operation.
 To perform a thread ID check the \texttt{inThreadAndReadable} function
