@@ -673,9 +673,10 @@ of resources that are being copied.
 
 It may be necessary to transfer a resource from one reference to another.
 Under these circumstances the old reference would need to be dropped after
-the resource has been transferred.
-Otherwise the old reference and new reference would be referring to the
-same resource. Here the resource owned by the reference \texttt{old} is
+the resource has been transferred, otherwise the old reference and new
+reference would be referring to the same resource.
+
+Here the resource owned by the reference \texttt{old} is
 transferred to the reference \texttt{new} and in the process the
 reference \texttt{old} is dropped:
 
@@ -683,13 +684,13 @@ reference \texttt{old} is dropped:
 new <- moveORef old
 \end{verbatim}
 
-A drop operation transfers a resource owned by one reference to a new reference or
-to an existing reference.
-After this operation is performed it will no longer be possible to refer to the
-underlying resource through the old reference. This
-operation removes the old reference from the scope of the ownership monad it
-previously existed in and the new reference is now the sole owner of the
-resource.
+A move operation transfers a resource owned by one reference to a new reference.
+An existing reference can also be overwritten by the moved contents of another
+reference using \texttt{moveORef'}.
+After a move operation is performed it will no longer be possible to refer to the
+underlying resource through the old reference.
+This operation removes the old reference from the scope of the ownership monad it
+previously existed in and the new reference is now the sole owner of the resource.
 
 \begin{verbatim}
 moveORef :: Typeable a => ORef a -> Own (ORef a)
@@ -712,24 +713,55 @@ which the operations are being performed in.
 The ownership system needs to enforce that the old ORef is
 writable in order for this operation to occur because this indicates that the
 resource has not been dropped and is still valid to use in this context.
-The ORef must also be writable in order to ensure that another function
-is not currently borrowing the resource in a mutable way.
+The ORef must also be writable in order to ensure that another operation
+is not currently using the resource in a mutable way.
 
-If the old ORef is valid and can be used in the operation a copy of it is made
-with the \texttt{copyORef} function.  After the copy is complete the old ORef
-is dropped using the \texttt{dropORef} function. This removes the old ORef from
-that monad and prevents other operations from referring to the resource through
-the old ORef.
-The old ORef and its entry have been dropped and are set to \texttt{Nothing}.
+If the old ORef is valid and can be used in the operation, a copy of it is made
+with the \texttt{copyORef} function.
+After the copy is complete during the move operation, the old ORef is dropped
+using the \texttt{dropORef} function.
+This removes the old ORef from that monad and prevents other operations from
+referring to the resource through the old ORef.
+The old ORef and its entry have been dropped and internally within the state of
+the monad are set to \texttt{Nothing}.
 The resource space inside the entry corresponding to the old ORef can be safely
 freed.
 
 There is a key difference between moving a resource from an existing reference
 and copying it to a new one.  Functionally a resource that is copied is cloned
 and duplicated; doing this doubles the space and creates a new resource.
+% refer to previous example from the copy section.
 A moved resource by comparison doesn't change.  Instead what is altered is the
 record of who owns that resource.  Neither operation, moving and copying,
 creates a situation where more than one reference owns a resource.
+
+\begin{verbatim}
+startOwn $ do
+  x <- newORef ``greeting''
+  y <- moveORef x
+  yContents <- readORef y
+  return yContents
+\end{verbatim}
+
+This expression does not violate the ownership rules and will evaluate
+to \texttt{Right ``greeting''}.
+If, for example, an expression tried to use a moved resource through an
+old reference binding, the expression will evaluate to a \texttt{Left} value
+such as for the following code:
+
+\begin{verbatim}
+startOwn $ do
+  x <- newORef ``greeting''
+  y <- moveORef x
+  xContents <- readORef x
+  yContents <- readORef y
+  return (xContents, yContents)
+\end{verbatim}
+
+This expression violates the ownership system rules and will evaluate to
+a \texttt{Left} because the first \texttt{readORef} operation used is
+attempting to read the resource in \texttt{x} that has been moved to \texttt{y}.
+
 
 \subsection{Writing to a Resource}
 

@@ -133,6 +133,22 @@ moveExample2 = do
 evalMoveExample2 :: IO (Either String ())
 evalMoveExample2 = startOwn moveExample2
 
+
+-- Example from paper of a move operation that will pass.
+moveOp1 = startOwn $ do
+  x <- newORef "greeting"
+  y <- moveORef x
+  yContents <- readORef y
+  return yContents
+
+-- Example from paper of a move operation that will fail.
+moveOp2 = startOwn $ do
+  x <- newORef "greeting"
+  y <- moveORef x
+  xContents <- readORef x
+  yContents <- readORef y
+  return (xContents, yContents)
+
 -- | borrowORef simple success test
 -- Trivial test for the borrow operation that should pass.
 borrowORefExample1 :: Own ()
