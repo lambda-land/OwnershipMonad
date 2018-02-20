@@ -154,7 +154,6 @@ moveOp2 = startOwn $ do
 borrowORefExample1 :: Own ()
 borrowORefExample1 = do
   x <- newORef "Hello from ORef x in borrowExample1!"
-  -- let f = (\x -> (liftIO $ putStrLn $ "The contents of the ORef is " ++ x))
   let f :: String -> IO ()
       f a = putStrLn $ "The contents of the ORef is " ++ a
       g :: String -> Own ()
@@ -166,6 +165,39 @@ borrowORefExample1 = do
 -- and should print the contents of the ORef
 evalBorrowORefExample1 :: IO (Either String ())
 evalBorrowORefExample1 = startOwn borrowORefExample1
+
+
+
+-- A simple example of a function with borrows a reference
+-- in order to print it.
+borrowExamplePaper1 = startOwn $ do
+  x <- newORef "Hello from inside the reference"
+  let f :: String -> Own ()
+      f a = liftIO $ putStrLn $ "The contents of the ORef is: " ++ a
+  _ <- borrowORef x f
+  return ()
+
+-- The reference is used by another operation after
+-- being borrowed.
+borrowExamplePaper2 = startOwn $ do
+  x <- newORef "Hello from inside the reference"
+  let f :: String -> Own ()
+      f a = liftIO $ putStrLn $ "The contents of the ORef is: " ++ a
+  _ <- borrowORef x f
+  contents <- readORef x
+  return contents
+
+-- With a function that does not return ownership of the ref
+borrowExamplePaper3 = startOwn $ do
+  x <- newORef "Hello from inside the reference"
+  let f :: String -> Own ()
+      f a = liftIO $ do
+        putStrLn $ "The contents of the ORef is: " ++ a
+        threadDelay 1000000 -- delay for 1 second
+  _ <- borrowORef x f
+  contents <- readORef x
+  return contents
+
 
 -- | borrowORef simple failure test
 -- Trivial test for the borrow operation that should fail
@@ -182,6 +214,8 @@ borrowORefExample2 = do
 evalBorrowORefExample2 :: IO (Either String ())
 evalBorrowORefExample2 = startOwn borrowORefExample2
 
+
+
 -- | borrowORef test
 -- A test to show that a partially applied writeORef passed as the function
 -- to a readORef will not be able to mutate the original ORef.
@@ -197,6 +231,20 @@ borrowORefExample3 = do
 evalBorrowORefExample3 :: IO (Either String ())
 evalBorrowORefExample3 = startOwn borrowORefExample3
 
+-- TODO
+-- | borrowORef test of multiple immutable borrows
+-- This is an example of multiple functions performing immutable operations on
+-- a single ORef
+
+-- TODO
+-- | borrowORef test for flag status.
+-- Test for borrowORef to show that during the read operation is the ORef is
+-- marked as having borrowers (both flags are False)
+-- and that after the borrow operation is complete the ORef is marked as not
+-- having any borrowers (both flags are True.)
+
+
+
 -- | writeORef test
 -- A trivial test to show a write operation that will succeed.
 writeORefExample1 :: Own ()
@@ -208,6 +256,19 @@ writeORefExample1 = do
 -- This should pass and evaluate to Right ()
 evalWriteORefExample1 :: IO (Either String ())
 evalWriteORefExample1 = startOwn writeORefExample1
+
+writeExamplePaper1 :: IO (Either String String)
+writeExamplePaper1 = startOwn $ do
+  ref <- newORef "Original contents"
+  writeORef ref "Some new contents"
+  readORef ref
+
+writeExamplePaper2 :: IO (Either String String)
+writeExamplePaper2 = startOwn $ do
+  ref <- newORef "Original contents"
+  dropORef ref
+  writeORef ref "Some new contents"
+  readORef ref
 
 -- | writeORef test
 -- A trivial test to show a write operation that will fail.
@@ -221,22 +282,6 @@ writeORefExample2 = do
 -- This should fail and evaluate to Left String
 evalWriteORefExample2 :: IO (Either String ())
 evalWriteORefExample2 = startOwn writeORefExample2
-
-
--- TODO
--- | borrowORef test of multiple immutable borrows
--- This is an example of multiple functions performing immutable operations on
--- a single ORef
-
--- TODO
--- | borrowORef test for flag status.
--- Test for borrowORef to show that during the read operation is the ORef is
--- marked as having borrowers (both flags are False)
--- and that after the borrow operation is complete the ORef is marked as not
--- having any borrowers (both flags are True.)
-
--- TODO
--- | mutableBorrowORef test
 
 
 
@@ -273,6 +318,7 @@ darkMagic x = startOwn $ do
   ref <- newORef x
   borrowORef ref (\b -> writeORef ref b)
   borrowORef ref (\a -> return (a + 1))
+
 
 
 -- | deadlock with normal MVars
@@ -313,6 +359,7 @@ deadlockORef = do
   liftIO $ threadDelay 1000 -- Wait a second just so that the output is printed nicely
   forkOwn $ nestedModificationORef b a
   return ()
+
 
 
 main :: IO ()

@@ -770,14 +770,37 @@ current value in an owned reference with a new value. This provides a way to
 safely mutate the contents of the reference while at the same time discarding
 it previous contents.
 
+For example in the following expression the contents of \texttt{ref}
+will be destructively updated with the new contents. This expression does
+not violate any ownership rules and will evaluate
+to \texttt{Right ``Some new contents''}. 
+
 \begin{verbatim}
-x <- newORef "Original contents"
-writeORef x "Some new contents"
+startOwn $ do
+  ref <- newORef "Original contents"
+  writeORef ref "Some new contents"
+  readORef ref
+\end{verbatim}
+
+Write operations will follow the ownership rules. Consequently the operation
+will not allow a resource to be updated if the reference no longer exists.
+If the reference in the previous example was dropped prior to the
+write operation the expression will evaluate to a \texttt{Left} value.
+The ownership monad will prevent the write operation from occuring because
+a dropped entry will no longer be writable.
+
+\begin{verbatim}
+startOwn $ do
+  ref <- newORef "Original contents"
+  dropORef ref
+  writeORef ref "Some new contents"
+  readORef ref
 \end{verbatim}
 
 The value within the resource can be updated and changed through the reference
 that owns the resource.
-A resource can be changed by its owner as long as it is writable.
+This is to say that the underlying resource can be changed by referring to its
+owner as long as it in scope and writable.
 This operation can be performed safely because the usage
 of the underlying resource is tracked by the ownership monad.
 
@@ -795,31 +818,63 @@ writeORef oref a = do
 
 The reference that is being changed cannot have any functions using the
 \texttt{ORef} and it must be in the same thread as the write operation.
-% TODO rework this sentence
-When the operation is performed the existing resource inside the ORef is over
-written by the new value.
+When the operation is performed the existing resource inside the \texttt{ORef}
+is over written by the new value.
+This naturally limits the user to overwriting the referrence with a new value
+without any regards to what the previous value was inside the reference.
+In order to alter the contents of a reference with a function based on what
+the contents of the reference presently is, the user must use a
+borrow operation.
 
 \subsection{Borrowing a Resource}
 
 Borrowing a resource is a library operation which allows a function to be able
-to use the contents of an owned reference.
+to use the contents of an owned reference and have protect access to
+the current value of the reference.
 The function that is granted access to the resource will be required to remain
-in the context of the original ownership monad.
+in the context of the ownership monad.
 
-This can be used to lend out the contents of a reference temporarily to be
-able to inspect it in a print statement.  Doing so will let us refer to the
-contents with more than one reference since we will return to the original
-context.  While the resource is lent out other operations will be prevented
-from using the reference.
+As a result, this operation can be used to lend out the contents of a reference
+temporarily to be able to inspect its current contents in a print statement.
+While the resource is lent out other operations will be prevented from using the
+reference.
 
 \begin{verbatim}
-x <- newORef "Hello from inside the reference"
-let f :: String -> Own ()
-    f a = liftIO $ putStrLn $ "The contents of the ORef is: " ++ a
-_ <- borrowORef x f
+startOwn $ do
+  x <- newORef "Hello from inside the reference"
+  let f :: String -> Own ()
+      f a = liftIO $ putStrLn $ "The contents of the ORef is: " ++ a
+  _ <- borrowORef x f
+  return ()
 \end{verbatim}
 
-This operation is similar to passing a value to a function as a mutable
+The previous expression will evaluate to \texttt{Right ()} and the contents
+of the reference will be printed to standard output.
+This would also be the outcome in a situation in which a long running function
+borrowed the resource.
+
+\begin{verbatim}
+startOwn $ do
+  x <- newORef "Hello from inside the reference"
+  let f :: String -> Own ()
+      f a = liftIO $ do
+        putStrLn $ "The contents of the ORef is: " ++ a
+        threadDelay 1000000   -- delay for 1 second
+  _ <- borrowORef x f
+  contents <- readORef x
+  return contents
+\end{verbatim}
+
+Because of the monadic sequencing of operations in a single thread,
+the outcome of a long acting function borrowing a function will be the same
+as that of a short acting function.
+The previous expression will print the contents of the referrence to
+standard output, delay for some time, and will then evalutate to
+a \texttt{Right} value.
+For single threaded operations the ownership rules will not be violated if
+a long running function borrows the resource inside a reference.
+
+The borrow operation is similar to passing a value to a function as a mutable
 borrow in the Rust language.
 As we saw with the example this library takes a slightly different approach:
 instead of letting variables borrow a resource, a borrow operation instead lends
@@ -909,26 +964,15 @@ This library does not allow multiple functions to simultaneously perform
 This restrictions means that the borrowing function is assumed to mutate the
 value in the reference but it is not required to do so.
 
-% There is no equivalent to a variable being borrowed by more than one immutable
-% borrower in Rust.
-% This could be done by making multiple copies of an \texttt{ORef} and
-% then giving these to individual borrowers.
+For convenience a second variant of the borrow operation is provided which
+updates the contents of the borrowed reference with the result of the function. 
+The type signature ensures that the function borrowing the reference will
+have the same resulting type as the reference:
 
+\begin{verbatim}
+borrowORef' :: Typeable a => ORef a -> (a -> Own a) -> Own ()
+\end{verbatim}
 
-% TODO this seems to be redundant and okay to get rid of.
-% To allow a mutable borrow it is necessary to know if other functions are
-% borrowing the resource. A mutable borrow can only occur if the reference
-% is readable and writable.
-% Each \texttt{ORef} already tracks if it is able to be read from or written to.
-
-% To allow for a borrower to have mutable access to the reference it needs to be
-% the sole borrower. If a resource can be both read from and written to then we
-% know it doesn't have any borrowers.
-
-
-% TODO explain why a mutableBorrowORef is not the same as a writeORef
-
-% TODO mention the other variant of borrows (named borrowORef')?
 
 \subsection{Reading from an ORef}
 
@@ -945,11 +989,16 @@ schrodingers_cat_alive <- readORef box
 
 Reading from an \texttt{ORef} will reveal what the contents of the \texttt{ORef}
 was at the time the read was performed but the \texttt{ORef} will continue to
-exist after the read operation and the value inside the \texttt{ORef} may change.
-The advantage of using a read instead of a borrow is that the read operations
-removes a copy of the resource from the confines of the \texttt{ORef}.
-This copied value is therefore freed from the restrictions imposed on values
+exist after the read operation. Because of this the value inside
+the \texttt{ORef} may later change.
+
+The advantage of using a read instead of a borrow is that the read operation will
+remove a copy of the resource from the confines of the \texttt{ORef}.
+This copied value is freed from the restrictions imposed on values
 contained inside references by the ownership system.
+As previous examples for the other ownership operations have shown, read
+operations are useful for extracting the final value from a reference at the
+completion of a series of ownerhip monad operations.
 
 \begin{verbatim}
 readORef :: Typeable a => ORef a -> Own a
