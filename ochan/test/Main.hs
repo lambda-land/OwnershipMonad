@@ -1,21 +1,19 @@
 module Main where
 
 import Control.Concurrent
-import Control.Concurrent.Async
-
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad (forever)
-
-import Data.Text (Text, pack)
-import Data.Text.Encoding (encodeUtf8)
-
 import Data.IORef
+import Data.Char (toLower, toUpper)
 
 import qualified Data.ByteString.Char8 as S8
-
+import Data.Text (Text, pack)
+import Data.Text.Encoding (encodeUtf8)
+import Control.Monad (forever)
+import Control.Concurrent.Async
 
 import Data.ORef
 import Control.Concurrent.OChan
+
 
 singleThreadedWrite :: Own ()
 singleThreadedWrite = do
@@ -31,17 +29,6 @@ singleThreadedWrite = do
 
   writeORef ref "Odo"
   -- ^^ writing to a ref that's no longer owned
-
-
--- threadTask :: Typeable a => (Chan a) -> IO ()
--- threadTask ch = do
---   ex <- (evalOwn $ do
---                _ <- readOChan' ch
---                return ()
---         )
---   case ex of
---     Left err -> do putStrLn ("Error" ++ err)
---     Right _ -> do putStrLn "Success"
 
 
 -- | A simple example using ORef's and OChan's to show a set of operations that
@@ -69,6 +56,54 @@ chanTest = do
       Left err -> do putStrLn ("Error" ++ err)
       Right _ -> do putStrLn "Success"
   return ()
+
+-- An example from the paper of regular channels passing a mutable reference
+regularChan :: IO ()
+regularChan = do
+  ref <- newIORef "test"
+  ch <- newChan
+  writeChan ch ref
+
+  _ <- forkIO $ do
+    ref' <- readChan ch
+    modifyIORef ref' (map toLower)
+
+  val <- readIORef ref
+  putStrLn val
+
+  modifyIORef ref (map toUpper)
+  newVal <- readIORef ref
+  putStrLn newVal
+
+-- The previous example but with owned channels
+introOChan :: IO (Either String ())
+introOChan = startOwn $ do
+  ref <- newORef "test"
+  ch <- newOChan
+  writeOChan' ch ref
+
+  let f :: String -> Own String
+      f x = return (map toLower x)
+
+      g :: String -> Own String
+      g x = return (map toUpper x)
+
+  _ <- liftIO $ forkIO $ do
+    _childResult <- startOwn $ do
+      ref' <- readOChan' ch
+      borrowORef' ref' f
+    return ()
+
+  borrowORef' ref g
+  return ()
+
+  -- val <- readIORef ref
+  -- putStrLn val
+
+  -- modifyIORef ref (map toUpper)
+  -- newVal <- readIORef ref
+  -- putStrLn newVal
+
 
 -- | An example using ORef's and OChan's to show a set of operations that
 -- will succeed.
@@ -156,6 +191,7 @@ forkedWriteExample = do
   -- write the oref to the channel - therefore consuming the oref
   writeOChan' ch ref
   return ()
+
 
 
 -- GHC's runtime does not specify an order for how it executes the code

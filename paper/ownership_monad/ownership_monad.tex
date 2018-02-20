@@ -43,7 +43,6 @@ the data making up the resources bound to variables is immutable.
 Because of this there is no inherent state.  Haskell's purity therefore allows
 for referential transparency where values and variables in closed expressions
 can be thought of as being interchangeable.
-% Evaluating an expression using the same inputs will result in the same output.
 
 Referential transparency is a desirable property which allows for a greater
 ability to reason about the behavior and correctness of a program.
@@ -58,7 +57,9 @@ Under these circumstances, Haskell's usual approach of segregating side-effects
 into monadic computations does not resolve every issue that can exist with
 shared-state concurrency.
 
-For example a race condition can be created when a mutable reference is shared
+\newpage
+
+A race condition can be created when a mutable reference is shared
 across a channel between two threads:
 
 \begin{verbatim}
@@ -66,9 +67,9 @@ import Data.IORef
 import Control.Concurrent
 import Data.Char (toLower, toUpper)
 
-main :: IO ()
-main = do
-  ref <- newIORef "test"
+introChan :: IO ()
+introChan = do
+  ref <- newIORef "resource"
   ch <- newChan
   writeChan ch ref
 
@@ -80,30 +81,75 @@ main = do
   putStrLn val
 
   modifyIORef ref (map toUpper)
-  val <- readIORef ref
-  putStrLn val
+  newVal <- readIORef ref
+  putStrLn newVal
 \end{verbatim}
 
 Here the \texttt{forkIO} function takes an expression of type \texttt{IO ()}
 and executes it in a new thread.
-% It returns the thread ID of the new child thread but this is discarded with an
-% underscore \texttt{_}.
 This new thread will run concurrently with the original parent thread.
 
 This creates a clear race condition between the two threads and the mutable
 contents of the \texttt{IORef} shared between them.
 % TODO explain what an IORef is?
-% TODO explain the example more.
 Both threads have access to the same \texttt{IORef} and it could be unclear
-which will access the resource first. Under these conditions the issue is not
+which will access the resource first.  Under these conditions the issue is not
 only that we have shared mutable state but that we have shared access to that
 state.
 
+This kind of race condition would be difficult to detect. 
+The easy culprit to blame in the previous example would be the
+mutable \texttt{IORef} shared between the two threads.
 Immutable data structures simplify concurrency and are preferable to
 mutable structures. However categories of problems still exist where a
 mutable structure is required.
-% TODO give some examples
 
+The \texttt{OChan} and \texttt{ORef} operations provided by this report's library
+allow a user to detect situations similar to the one created by the previous
+example which would result in a race condition.
+A comparable program using the abstractions provided by the ownership system
+would be able to detect the race condition before it occurred:
+
+\begin{verbatim}
+introOChan :: IO (Either String ())
+introOChan = startOwn $ do
+  ref <- newORef "resource"
+  ch <- newOChan
+  writeOChan' ch ref
+
+  let f :: String -> Own String
+      f x = return (map toLower x)
+
+      g :: String -> Own String
+      g x = return (map toUpper x)
+
+  _ <- liftIO $ forkIO $ do
+    _childResult <- startOwn $ do
+      ref' <- readOChan' ch
+      borrowORef' ref' f
+    return ()
+
+  borrowORef' ref g
+  return ()
+\end{verbatim}
+
+Here a resource is created and placed within an \texttt{ORef}.
+The parent thread proceeds to give up ownership of the \texttt{ORef} when it
+writes it to the owned channel.
+The child thread can read the \texttt{ORef} from the \texttt{OChan} and claim
+ownership over its contents.
+The child thread can then mutate the resource in a borrow operation before
+writing it back to the channel. 
+
+This example demonstrates a sequence of actions that result in an ownership
+violation. The issue being that the parent thread tries to use a reference
+that it has already given up ownership by writing to a channel.
+
+When the overall example is evaluated it will result in a \texttt{Left} value
+which will indicate the kind of ownership violation which took place.
+A simple remedy for the violation can then be found.
+For this example the parent thread could take back ownership of the reference by
+reading it from the owned channel.
 
 \section{Contributions}
 
@@ -112,8 +158,6 @@ ownership typing to define a similar method for tracking resources with Haskell.
 This is combined with the approach of defining embedded languages in monadic
 programming to allow for dynamic ownership checking without language level
 support for affine types in Haskell.
-% This project will demonstrate that the existing model
-% for embedded languages in monadic programming extends to affine types.
 
 Concurrent Haskell programs can still fall prey to some of the same fundamental
 problems that other impure languages can, namely deadlock and starvation.
@@ -1374,78 +1418,8 @@ It was noted earlier that there are write and read functions provided
 in the \texttt{OChan} library that can operate on normal \texttt{IO} bound
 channels.  Using a regular channel in the ownership monad with the write and
 read operation for owned references provides the same ability to reason about
-resource use and detect violaions.
-% However using the write and read functions which only operate on owned channel
-% safeguard against accidentally trying to use the traditional channel write and
-% read functions with \texttt{liftIO}.
+resource use and detect violations.
 
-\section{Detecting Race Conditions}
-
-In the original example in the introduction an undectable race condition was
-created by passing an IORef across a channel between two threads.
-Using \texttt{OChan} and \texttt{ORef} operations it is now possible
-to pass an \texttt{IOREf} between two channels and detect a situation
-that would result in a race condition before the race condition happens.
-
-This is an example of an operation that will succeed. Here we create an
-\texttt{IORef} and place it in an \texttt{ORef}. The parent thread
-then gives up ownership of the \texttt{ORef} when it writes it to the
-owned channel. The child thread can read the \texttt{ORef} from the
-\texttt{OChan} and claim ownership over its contents. The child thread
-can mutate the resource in a borrow operation and then write it back to
-the channel. 
-
-\begin{verbatim}
-mutableOChanTest :: Own ()
-mutableOChanTest = do
-  ch <- newOChan
-
-  ioref <- liftIO $ do
-    r <- newIORef "hello"
-    return r
-
-  ref <- newORef ioref
-
-  writeOChan ch ref
-
-  _ <- liftIO $ forkIO $ do
-    ex <- startOwn $ do
-      oref <- readOChan ch
-      borrowORef
-        oref
-        (\x -> do
-            liftIO $ modifyIORef x ((++) " from the child thread")
-        )
-      writeOChan ch oref
-      return ()
-    return ()
-
-  oref' <- readOChan ch
-  borrowORef
-    oref'
-    (\x -> do
-        liftIO $ do
-          contents <- readIORef x
-          putStrLn contents
-    )
-  return ()
-\end{verbatim}
-
-
-% \section{Preventing Deadlock}
-% % Describe/Define Deadlock
-% TODO
-
-% \subsection{Explicit Resource Ownership Prevents Deadlock}
-% % How ownership prevents deadlock
-% TODO
-
-% \section{Beyond Threads}
-
-% TODO
-
-% How Ownership could be used for resources between processes using D-Bus and also
-% servers in distributed computing.
 
 
 \chapter{Conclusion}
