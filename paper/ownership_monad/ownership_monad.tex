@@ -160,35 +160,16 @@ programming to allow for dynamic ownership checking without language level
 support for affine types in Haskell.
 
 Concurrent Haskell programs can still fall prey to some of the same fundamental
-problems that other impure languages can, namely deadlock and starvation.
-% TODO add citation for shared-state concurrency from Real World Haskell
-% In Concurrent Haskell the most basic way to allow separate threads to
-% communicate is with a shared mutable variable. 
+problems that other impure languages can, namely deadlock and data races.
 This project report will demonstrate a motivation for adding the kind of
-resource tracking that ownership typing provides by looking at what some of
-these problems look like and how resource tracking acts to mitigate these
-problems.  This will use the basic concurrency tools available in Haskell
-such as shared state with MVar's and message passing with Channels.
+resource tracking that ownership typing provides by
+looking at what some of these problems look like and how resource tracking acts
+to mitigate these problems.
+This will use the basic concurrency tools available in Haskell
+such as shared state with MVar's and message passing with channels.
 It will then demonstrate and explain the benefits of tracking resource usage
 with a set of rules similar to affine types.
-
-
-% While this library does not do so - by tracking resources with the ownership
-% system it becomes in theory possible to reason about the memory usage over the
-% lifetime of a program using the type system of the language. 
-% refer to:
-%https://groups.google.com/d/msg/idris-lang/NsxReBzk7LQ/0fSPgu-4EgAJ
-% This method makes it possible to do a form of automatic deterministic destruction
-% instead of the typical garbage collection approaches.  This paper will show
-% where in an example program this could occur.
-
-% TODO refer to this:
-% Using the type system to encode and explain what is happening with the underlying
-% resources in a general way that can be independently verified and checked greatly
-% increases our confidence and ability to know when a resource is finished being used.
-% refer to Edwin Brady quote at:
-% https://groups.google.com/d/msg/idris-lang/Z28F3MBBtTM/XOnUcrvsBAAJ
-
+% TODO mention how it makes it easier to debug and detect these problems
 
 \chapter{Background}
 
