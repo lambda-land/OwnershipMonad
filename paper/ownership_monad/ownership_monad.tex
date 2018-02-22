@@ -293,7 +293,7 @@ When a resource is created and bound to a variable, such as \texttt{v1} in the
 example below, that variable is the \textit{owner} of the resource.
 
 \begin{verbatim}
-let v1 = vec![``Vector'', ``of'', ``Strings''];
+let v1 = vec!["Vector", "of", "Strings"];
 \end{verbatim}
 
 Ownership may be transferred to a different variable with a new assignment.
@@ -314,7 +314,7 @@ use the resource owned by another variable without taking ownership over it.
 To do this a borrow of that variable is created:
 
 \begin{verbatim}
-let v1 = vec![``Vector'', ``of'', ``Strings''];
+let v1 = vec!["Vector", "of", "Strings"];
 let v2 = &v1;
 \end{verbatim}
 
@@ -763,7 +763,7 @@ creates a situation where more than one reference owns a resource.
 
 \begin{verbatim}
 startOwn $ do
-  x <- newORef ``greeting''
+  x <- newORef "greeting"
   y <- moveORef x
   yContents <- readORef y
   return yContents
@@ -777,7 +777,7 @@ such as for the following code:
 
 \begin{verbatim}
 startOwn $ do
-  x <- newORef ``greeting''
+  x <- newORef "greeting"
   y <- moveORef x
   xContents <- readORef x
   yContents <- readORef y
