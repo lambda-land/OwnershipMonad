@@ -127,6 +127,7 @@ introOChan = startOwn $ do
     _childResult <- startOwn $ do
       ref' <- readOChan' ch
       borrowORef' ref' f
+      writeOChan' ch ref'
     return ()
 
   borrowORef' ref g
@@ -1142,23 +1143,59 @@ continueOwn x = do
   liftIO $ runEitherT (evalStateT x s)
 \end{verbatim}
 
-% TODO add example
+The \texttt{evalOwn} function can be used to evaluate an ownership computation
+with the initial context passed as an argument.
 
-% The \texttt{evalOwn} function can be used to evaluate an ownership computation
-% with the initial context passed as an argument.
+\begin{verbatim}
+evalOwn :: Own a -> (ID,Store) -> IO (Either String a)
+evalOwn actions startState =
+  runEitherT (evalStateT actions startState)
+\end{verbatim}
 
-% \begin{verbatim}
-% evalOwn :: Own a -> (ID,Store) -> IO (Either String a)
-% evalOwn actions startState =
-%   runEitherT (evalStateT actions startState)
-% \end{verbatim}
+% TODO explain forkOwn
 
+\begin{verbatim}
+forkOwn :: Own a -> Own ()
+forkOwn innerOps = do
+  parentState <- get
+  _ <- liftIO $ forkIO $ do
+    childResult <- evalOwn innerOps parentState
+    case childResult of
+      Left violation -> 
+         putStrLn $ "A child thread failed with the following: " ++ violation
+      Right _ -> return ()
+  return ()
+\end{verbatim}
 
-% Explain EitherT and StateT ?
+\section{Mitigating Deadlock}
 
+% TODO introduce and cite the lock order inversion example and ORef variant
 
-% TODO ORef's example section
+Instead of having to remember what order to aquire locks, the owned references
+will fail with a description of the violation.
 
+This example produces an ownership violation because owned references are only
+owned by the thread which created them. The contents, while internally mutable,
+cannot be shared across a thread as a mutable value. The mutability only exists
+wiithin the scope of the monad which owns the \texttt{ORef}.
+% Mention that the resources in a channel are of course mutable but also
+% wrapped in the ownerhip protection
+
+The issue presented in the locking access example is rooted in the % unregulated
+mutability of the MVar's. While owned references are mutable, as we have seen
+with their internal \texttt{IORef}, this is wrapped in the ownership system
+rules.
+
+\subsection{ORef's in multithreaded programs}
+
+As the previouse example demonstrated owned references are only valid within the
+scope of the thread that created them.  But this does not preclude them from
+being used in multithreaded programs.
+In order to do that, a way to give up ownership of an \texttt{ORef} when it's
+been shared between threads is needed.  The ownership system needs to prevent a
+situation in which a thread attempts to use a resource that the thread has given
+up ownership over by sharing. 
+% The key to this is owned channels
 
 \chapter{Owned Channels}
 

@@ -321,6 +321,7 @@ darkMagic x = startOwn $ do
 
 
 
+
 -- | deadlock with normal MVars
 --
 -- If you run this in ghci, it will usually—but not always—print nothing.
@@ -339,6 +340,7 @@ deadlockMVar = do
   b <- newMVar 2
   forkIO $ nestedModification a b
   forkIO $ nestedModification b a
+
 
 -- |  with normal mvars
 -- Adapted for ORef from Real World Haskell's example on deadlock with MVar's
@@ -431,6 +433,9 @@ main = do
     Right _ -> putStrLn " -- Test 12 failed. -- "
     Left _ -> putStrLn "Test 12 passed."
 
+
+  -- TODO separate tests from complex examples
+
   putStrLn "\nSome more complex examples: "
 
   g <- evalGood
@@ -442,7 +447,9 @@ main = do
   m <- magic 1
   putStrLn (show m)
 
+
   -- Run these two in GHCi
+  -- TODO find a better way to log multi-threaded test ouput
 
   putStrLn "\nDeadlock MVar"
   dlmv <- deadlockMVar
@@ -450,7 +457,7 @@ main = do
 
   threadDelay 1000
 
-  putStrLn "\nORef example with no deadlock"
+  putStrLn "\nORef deadlock example:"
   -- this should fail - not with an exception but with a Left String
   dlor <- startOwn deadlockORef :: IO (Either String ())
   threadDelay 1000

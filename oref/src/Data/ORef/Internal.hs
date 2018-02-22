@@ -252,18 +252,6 @@ continueOwn x = do
   s <- get
   liftIO $ runEitherT (evalStateT x s)
 
--- | Create a child thread that uses the state of the parent thread's ownership
--- context when evaluating it's ownership operations in the child thread
-forkOwn :: Show a => Own a -> Own ()
-forkOwn innerOps = do
-  parentState <- get -- get the parent state before forking
-  _ <- liftIO $ forkIO $ do
-    -- within IO
-    childResult <- evalOwn innerOps parentState
-    putStrLn $ "The child result was " ++ (show childResult)
-    return ()
-  return ()
-
 -- | Run an action in the ownership monad and return its result.
 --
 -- Evaluate an ownership computation with the initial context passed as an
@@ -271,6 +259,19 @@ forkOwn innerOps = do
 evalOwn :: Own a -> (ID,Store) -> IO (Either String a)
 evalOwn actions startState =
   runEitherT (evalStateT actions startState)
+
+-- | Create a child thread that uses the state of the parent thread's ownership
+-- context when evaluating it's ownership operations in the child thread
+forkOwn :: Own a -> Own ()
+forkOwn innerOps = do
+  parentState <- get -- get the parent state before forking
+  _ <- liftIO $ forkIO $ do
+    -- child thread
+    childResult <- evalOwn innerOps parentState
+    case childResult of
+      Left violation -> putStrLn $ "A child thread failed with the following: " ++ violation
+      Right _ -> return ()
+  return ()
 
 -- | Run an action in the ownership monad and return its result.
 --

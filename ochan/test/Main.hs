@@ -92,6 +92,7 @@ introOChan = startOwn $ do
     _childResult <- startOwn $ do
       ref' <- readOChan' ch
       borrowORef' ref' f
+      writeOChan' ch ref'
     return ()
 
   borrowORef' ref g
@@ -103,6 +104,7 @@ introOChan = startOwn $ do
   -- modifyIORef ref (map toUpper)
   -- newVal <- readIORef ref
   -- putStrLn newVal
+
 
 
 -- | An example using ORef's and OChan's to show a set of operations that
