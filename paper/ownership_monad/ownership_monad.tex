@@ -25,7 +25,12 @@
 
 \chapter{Introduction}
 
-This project report presents a library for Haskell that implements an
+This project report presents a
+library\footnote{
+  The library presented in this project report is available at:
+  \href{https://github.com/lambda-land/OwnershipMonad}{https://github.com/lambda-land/OwnershipMonad}
+}
+for Haskell that implements an
 \textit{ownership system} for resource aware programming. This ownership system
 introduces a set of rules that govern how, when, and by whom a resource within
 what is called an \textit{Owned Reference} (an \texttt{ORef}) can be used.
@@ -117,20 +122,20 @@ introOChan = startOwn $ do
   ch <- newOChan
   writeOChan' ch ref
 
-  let f :: String -> Own String
-      f x = return (map toLower x)
+  let down :: String -> Own String
+      down x = return (map toLower x)
 
-      g :: String -> Own String
-      g x = return (map toUpper x)
+      up :: String -> Own String
+      up x = return (map toUpper x)
 
   _ <- liftIO $ forkIO $ do
     _childResult <- startOwn $ do
       ref' <- readOChan' ch
-      borrowORef' ref' f
+      borrowORef' ref' down
       writeOChan' ch ref'
     return ()
 
-  borrowORef' ref g
+  borrowORef' ref up
   return ()
 \end{verbatim}
 
@@ -167,7 +172,7 @@ resource tracking that ownership typing provides by
 looking at what some of these problems look like and how resource tracking acts
 to mitigate these problems.
 This will use the basic concurrency tools available in Haskell
-such as shared state with MVar's and message passing with channels.
+such as shared state with IORef's and message passing with channels.
 It will then demonstrate and explain the benefits of tracking resource usage
 with a set of rules similar to affine types.
 % TODO mention how it makes it easier to debug and detect these problems
@@ -1170,40 +1175,115 @@ forkOwn innerOps = do
 The ownership expresion of type \texttt{Own a} is passed as
 an argument. The \texttt{forkOwn} function evaluates the ownership operations
 using a new ownership monad state. The child thread will execute the
-expression it is given and will print debuggin information to standard output
+expression it is given and will print debugging information to standard output
 in the case of an ownership violation.
+
 
 
 \section{Mitigating Deadlock}
 
-% TODO introduce and cite the lock order inversion example and ORef variant
+Typically mutable resources are protected by granting exclusive access
+of the resource to one thread at a time.
+Other threads will have to block until the thread, which possesses access,
+releases the resource.
 
-Instead of having to remember what order to acquire locks, the owned references
-will fail with a description of the violation.
+This form of concurrency control is often referred to as a mutex, a
+portmanteau of the words mutual and exclusion.
+While a mutex is enough to prevent a data race, where two resources have
+unfettered access to the same shared resource, without careful consideration
+a mutex can easily create a deadlock situation.
 
-This example produces an ownership violation because owned references are only
-owned by the thread which created them. The contents, while internally mutable,
-cannot be shared across a thread as a mutable value. The mutability only exists
-within the scope of the monad which owns the \texttt{ORef}.
+Deadlock situations are common when shared resources, protected through
+mutual exclusion, are nested.  MVar's (mutable variables) in Haskell can be
+used to demonstrate such a situation:\footnote{ This example of lock order
+  inversion deadlock adapted from the example of deadlock from Chapter 24 of
+  Real World Haskell \cite{O'Sullivan:2008:RWH:1523280} }
+
+\begin{verbatim}
+nestedResources :: MVar Int -> MVar Int -> IO ()
+nestedResources outerResource innerResource = do
+  modifyMVar_ outerResource $ \outer -> do
+      yield
+      modifyMVar_ innerResource $ \inner -> return (inner + 1)
+      return (outer + 1)
+  return ()
+
+deadlockMVar :: IO ()
+deadlockMVar = do
+  resourceA <- newMVar 0
+  resourceB <- newMVar 0
+  forkIO $ nestedResources resourceA resourceB
+  forkIO $ nestedResources resourceB resourceA
+  return ()
+\end{verbatim}
+
+The \texttt{yield} function is used here to force a context switch to the other
+available runnable thread.
+Lock inversion deadlock in general, and in this example
+specifically, is created because in order for the function to release the outer
+resource (if it possesses it) it must gain access to the inner resource.
+In a multi-threaded program, one thread may gain access to one resource,
+while at the same time another thread gains access to the other resource.
+In such a situation both threads now need what the other thread has in order to
+release their resource they already hold.
+
+This kind of bug is difficult to find and debug because it cannot be dependably
+reproduced.  The reason for this is that the situation described in this
+example which creates the deadlock will not always occur.
+This contributes to deadlock bugs being difficult to isolate and fix when they
+do occur.
+
+This example can be adapted to work with owned references.
+When this is done, instead of spasmodically creating a deadlock condition,
+it will always create an ownership violation and fail with a description of the
+violation.
+Instead of having to remember what order to acquire locks and where the
+resources are being accessed in their program, the library user can fix the
+ownership violation they introduced into their multi-threaded program:
+
+\begin{verbatim}
+nestedORef :: ORef Int -> ORef Int -> Own ()
+nestedORef outerRef innerRef = do
+  borrowORef' outerRef $ \outer -> do
+    liftIO $ yield
+    borrowORef' innerRef $ \inner -> return (inner + 1)
+    return (outer + 1)
+  return ()
+
+deadlockORef :: Own ()
+deadlockORef = do
+  orefA <- newORef 0
+  orefB <- newORef 0
+  forkOwn $ nestedORef orefA orefB
+  forkOwn $ nestedORef orefB orefB
+  return ()
+\end{verbatim}
+
+This example % trivially
+produces an ownership violation because owned references are only owned by the
+thread which created them.
+The contents of the owned references, while internally mutable, cannot be shared
+across a thread as a mutable value in the same way that MVar's or IORef's can be.
+This restriction is intentional; the mutability only exists within the scope of
+the monad which owns the \texttt{ORef}.
 % Mention that the resources in a channel are of course mutable but also
 % wrapped in the ownerhip protection
 
-The issue presented in the locking access example is rooted in the % unregulated
-mutability of the MVar's. While owned references are mutable, as we have seen
-with their internal \texttt{IORef}, this is wrapped in the ownership system
-rules.
+The issue presented in the earlier locking access example with MVar's is rooted
+in the ability to share access to mutable resources in un-intended ways.
+In comparison, while owned references are mutable (as we have seen
+with their internal \texttt{IORef} implementation) this is wrapped in the
+ownership system rules.
 
-\subsection{ORef's in multithreaded programs}
+\subsection{ORef's in Multi-threaded Programs}
 
 As the previous example demonstrated owned references are only valid within the
 scope of the thread that created them.  But this does not preclude them from
-being used in multithreaded programs.
+being used in multi-threaded programs.
 In order to do that, a way to give up ownership of an \texttt{ORef} when it's
-been shared between threads is needed.  The ownership system needs to prevent a
-situation in which a thread attempts to use a resource that the thread has given
-up ownership over by sharing. 
-% The key to this is owned channels
-
+been shared between threads is needed.
+The ownership system needs to prevent a situation in which a thread attempts to
+use a resource that the thread has given up ownership over by sharing. 
 
 
 \chapter{Owned Channels}

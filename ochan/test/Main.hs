@@ -82,29 +82,21 @@ introOChan = startOwn $ do
   ch <- newOChan
   writeOChan' ch ref
 
-  let f :: String -> Own String
-      f x = return (map toLower x)
+  let down :: String -> Own String
+      down x = return (map toLower x)
 
-      g :: String -> Own String
-      g x = return (map toUpper x)
+      up :: String -> Own String
+      up x = return (map toUpper x)
 
   _ <- liftIO $ forkIO $ do
     _childResult <- startOwn $ do
       ref' <- readOChan' ch
-      borrowORef' ref' f
+      borrowORef' ref' down
       writeOChan' ch ref'
     return ()
 
-  borrowORef' ref g
+  borrowORef' ref up
   return ()
-
-  -- val <- readIORef ref
-  -- putStrLn val
-
-  -- modifyIORef ref (map toUpper)
-  -- newVal <- readIORef ref
-  -- putStrLn newVal
-
 
 
 -- | An example using ORef's and OChan's to show a set of operations that

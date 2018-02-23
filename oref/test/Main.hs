@@ -2,6 +2,7 @@ module Main where
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent
+import Data.IORef
 
 import Data.Typeable (Typeable)
 
@@ -322,44 +323,42 @@ darkMagic x = startOwn $ do
 
 
 
--- | deadlock with normal MVars
---
--- If you run this in ghci, it will usually—but not always—print nothing.
+-- | deadlock with IORef's
 --
 -- Adapted from Real World Haskell's example on deadlock with MVar's
 -- TODO Cite Chapter 24 of Real World Haskell
-nestedModification outer inner = do
-  modifyMVar_ outer $ \x -> do
-    yield  -- force this thread to temporarily yield the CPU
-    modifyMVar_ inner $ \y -> return (y + 1)
-    return (x + 1)
-  putStrLn "done"
+nestedResources :: MVar Int -> MVar Int -> IO ()
+nestedResources outerResource innerResource = do
+  modifyMVar_ outerResource $ \outer -> do
+      yield
+      modifyMVar_ innerResource $ \inner -> return (inner + 1)
+      return (outer + 1)
+  return ()
 
+deadlockMVar :: IO ()
 deadlockMVar = do
-  a <- newMVar 1
-  b <- newMVar 2
-  forkIO $ nestedModification a b
-  forkIO $ nestedModification b a
+  resourceA <- newMVar 0
+  resourceB <- newMVar 0
+  forkIO $ nestedResources resourceA resourceB
+  forkIO $ nestedResources resourceB resourceA
+  return ()
 
-
--- |  with normal mvars
--- Adapted for ORef from Real World Haskell's example on deadlock with MVar's
--- TODO Cite Chapter 24 of Real World Haskell
-nestedModificationORef :: (Typeable a, Num a) => ORef a -> ORef a -> Own ()
-nestedModificationORef outer inner = do
-  borrowORef' outer $ \x -> do
-    liftIO $ yield  -- force this thread to temporarily yield the CPU
-    borrowORef' inner $ \y -> return (y + 1)
-    return (x + 1)
-  liftIO $ putStrLn "done - ORef deadlock example"
+-- And with ORef's
+nestedORef :: ORef Int -> ORef Int -> Own ()
+nestedORef outerRef innerRef = do
+  borrowORef' outerRef $ \outer -> do
+    liftIO $ yield
+    borrowORef' innerRef $ \inner -> return (inner + 1)
+    return (outer + 1)
+  return ()
 
 deadlockORef :: Own ()
 deadlockORef = do
-  a <- newORef (1 :: Int)
-  b <- newORef 2
-  forkOwn $ nestedModificationORef a b
+  orefA <- newORef 0
+  orefB <- newORef 0
+  forkOwn $ nestedORef orefA orefB
   liftIO $ threadDelay 1000 -- Wait a second just so that the output is printed nicely
-  forkOwn $ nestedModificationORef b a
+  forkOwn $ nestedORef orefB orefB
   return ()
 
 
