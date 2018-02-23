@@ -159,7 +159,7 @@ value (Entry _ _ Nothing) = return Nothing
 -- | Get an entry from the store or fail if no such entry exists.
 getEntry :: ORef a -> Own Entry
 getEntry (ORef i) = get >>= maybe err return . lookup i . snd
-  where err = error ("entry not found: " ++ show i)
+  where err = lift $ left ("Entry for ORef not found. ORef likely does not exist in the context used. Entry id: " ++ show i)
 
 -- | Set the flag and value for an entry in the store.
 --
@@ -260,14 +260,13 @@ evalOwn :: Own a -> (ID,Store) -> IO (Either String a)
 evalOwn actions startState =
   runEitherT (evalStateT actions startState)
 
--- | Create a child thread that uses the state of the parent thread's ownership
--- context when evaluating it's ownership operations in the child thread
+-- | Create a child thread that uses a fresh ownership context to evaluate
+-- the ownership operations in a new thread.
 forkOwn :: Own a -> Own ()
 forkOwn innerOps = do
-  parentState <- get -- get the parent state before forking
   _ <- liftIO $ forkIO $ do
     -- child thread
-    childResult <- evalOwn innerOps parentState
+    childResult <- startOwn innerOps
     case childResult of
       Left violation -> putStrLn $ "A child thread failed with the following: " ++ violation
       Right _ -> return ()

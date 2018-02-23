@@ -1130,7 +1130,14 @@ startOwn :: Own a -> IO (Either String a)
 startOwn x = runEitherT (evalStateT x (0, empty))
 \end{verbatim}
 
-% TODO add example
+The \texttt{evalOwn} function can be used to evaluate an ownership computation
+with the initial context passed as an argument.
+
+\begin{verbatim}
+evalOwn :: Own a -> (ID,Store) -> IO (Either String a)
+evalOwn actions startState =
+  runEitherT (evalStateT actions startState)
+\end{verbatim}
 
 The \texttt{continueOwn} function can be used to evaluate a nested ownership
 computation from within an existing ownership monad.  This will use the
@@ -1143,23 +1150,16 @@ continueOwn x = do
   liftIO $ runEitherT (evalStateT x s)
 \end{verbatim}
 
-The \texttt{evalOwn} function can be used to evaluate an ownership computation
-with the initial context passed as an argument.
-
-\begin{verbatim}
-evalOwn :: Own a -> (ID,Store) -> IO (Either String a)
-evalOwn actions startState =
-  runEitherT (evalStateT actions startState)
-\end{verbatim}
-
-% TODO explain forkOwn
+There may be functions which operate in the ownership monad which a user would
+like to run in a separate thread.
+The \texttt{forkOwn} function provides a way for an ownership expression to be
+sent to be evaluated in a separate thread.
 
 \begin{verbatim}
 forkOwn :: Own a -> Own ()
 forkOwn innerOps = do
-  parentState <- get
   _ <- liftIO $ forkIO $ do
-    childResult <- evalOwn innerOps parentState
+    childResult <- startOwn innerOps
     case childResult of
       Left violation -> 
          putStrLn $ "A child thread failed with the following: " ++ violation
@@ -1167,17 +1167,24 @@ forkOwn innerOps = do
   return ()
 \end{verbatim}
 
+The ownership expresion of type \texttt{Own a} is passed as
+an argument. The \texttt{forkOwn} function evaluates the ownership operations
+using a new ownership monad state. The child thread will execute the
+expression it is given and will print debuggin information to standard output
+in the case of an ownership violation.
+
+
 \section{Mitigating Deadlock}
 
 % TODO introduce and cite the lock order inversion example and ORef variant
 
-Instead of having to remember what order to aquire locks, the owned references
+Instead of having to remember what order to acquire locks, the owned references
 will fail with a description of the violation.
 
 This example produces an ownership violation because owned references are only
 owned by the thread which created them. The contents, while internally mutable,
 cannot be shared across a thread as a mutable value. The mutability only exists
-wiithin the scope of the monad which owns the \texttt{ORef}.
+within the scope of the monad which owns the \texttt{ORef}.
 % Mention that the resources in a channel are of course mutable but also
 % wrapped in the ownerhip protection
 
@@ -1188,7 +1195,7 @@ rules.
 
 \subsection{ORef's in multithreaded programs}
 
-As the previouse example demonstrated owned references are only valid within the
+As the previous example demonstrated owned references are only valid within the
 scope of the thread that created them.  But this does not preclude them from
 being used in multithreaded programs.
 In order to do that, a way to give up ownership of an \texttt{ORef} when it's
@@ -1196,6 +1203,8 @@ been shared between threads is needed.  The ownership system needs to prevent a
 situation in which a thread attempts to use a resource that the thread has given
 up ownership over by sharing. 
 % The key to this is owned channels
+
+
 
 \chapter{Owned Channels}
 
