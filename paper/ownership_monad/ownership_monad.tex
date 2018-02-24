@@ -15,8 +15,14 @@
 
 \usepackage{algorithm}
 \usepackage{algorithmic}
-
 \usepackage{hyperref} % For links
+\usepackage{listings} % For code examples
+
+% set listings env settings
+\lstset{basicstyle=\ttfamily, frame=single, language=Haskell, numbers=left }
+% \lstset{basicstyle=\ttfamily, language=Haskell, numbers=left }
+% \lstset{ language=Haskell, numbers=left}
+
 
 \begin{document}
 \maketitle
@@ -71,7 +77,7 @@ shared-state concurrency.
 A simple example of this is the race condition that can be created when a
 mutable reference is shared across a channel between two threads:
 
-\begin{verbatim}
+\begin{lstlisting}
 import Data.IORef
 import Control.Concurrent
 import Data.Char (toLower, toUpper)
@@ -92,7 +98,7 @@ introChan = do
   modifyIORef ref (map toUpper)
   newVal <- readIORef ref
   putStrLn newVal
-\end{verbatim}
+\end{lstlisting}
 
 Here the \texttt{forkIO} function takes an expression of type \texttt{IO ()}
 and executes it in a new thread.
@@ -119,12 +125,15 @@ example, which would result in a race condition.
 A comparable program using the abstractions provided by the ownership system
 would be able to detect the race condition before it occurred:
 
-\begin{verbatim}
+\begin{lstlisting}
+import Data.ORef
+import Control.Concurrent.OChan
+
 introOChan :: IO (Either String ())
 introOChan = startOwn $ do
   ref <- newORef "resource"
-  ch <- newOChan
-  writeOChan' ch ref
+  let ch = newOChan
+  writeOChan ch ref
 
   let down :: String -> Own String
       down x = return (map toLower x)
@@ -134,19 +143,18 @@ introOChan = startOwn $ do
 
   _ <- liftIO $ forkIO $ do
     _childResult <- startOwn $ do
-      ref' <- readOChan' ch
+      ref' <- readOChan ch
       borrowORef' ref' down
-      writeOChan' ch ref'
+      writeOChan ch ref'
     return ()
 
   borrowORef' ref up
   return ()
-\end{verbatim}
-
+\end{lstlisting}
 
 Here a resource is created and placed within an \texttt{ORef}.
 The parent thread proceeds to give up ownership of the \texttt{ORef} when it
-writes it to the owned channel.
+writes it to the owned channel on line 5.
 The child thread can read the \texttt{ORef} from the \texttt{OChan} and claim
 ownership over its contents.
 The child thread can then mutate the resource in a borrow operation before
@@ -1207,12 +1215,13 @@ used to demonstrate such a situation:\footnote{ This example of lock order
   inversion deadlock adapted from the example of deadlock from Chapter 24 of
   Real World Haskell \cite{O'Sullivan:2008:RWH:1523280} }
 
-\begin{verbatim}
+\begin{lstlisting}
 nestedResources :: MVar Int -> MVar Int -> IO ()
 nestedResources outerResource innerResource = do
   modifyMVar_ outerResource $ \outer -> do
       yield
-      modifyMVar_ innerResource $ \inner -> return (inner + 1)
+      modifyMVar_ innerResource $
+                    \inner -> return (inner + 1)
       return (outer + 1)
   return ()
 
@@ -1223,7 +1232,7 @@ deadlockMVar = do
   forkIO $ nestedResources resourceA resourceB
   forkIO $ nestedResources resourceB resourceA
   return ()
-\end{verbatim}
+\end{lstlisting}
 
 The \texttt{yield} function is used here to force a context switch to the other
 available runnable thread.
@@ -1249,12 +1258,13 @@ Instead of having to remember what order to acquire locks and where the
 resources are being accessed in their program, the library user can fix the
 ownership violation they introduced into their multi-threaded program:
 
-\begin{verbatim}
+\begin{lstlisting}
 nestedORef :: ORef Int -> ORef Int -> Own ()
 nestedORef outerRef innerRef = do
   borrowORef' outerRef $ \outer -> do
     liftIO $ yield
-    borrowORef' innerRef $ \inner -> return (inner + 1)
+    borrowORef' innerRef $ 
+                  \inner -> return (inner + 1)
     return (outer + 1)
   return ()
 
@@ -1265,7 +1275,7 @@ deadlockORef = do
   forkOwn $ nestedORef orefA orefB
   forkOwn $ nestedORef orefB orefB
   return ()
-\end{verbatim}
+\end{lstlisting}
 
 This example % trivially
 produces an ownership violation because owned references are only owned by the
@@ -1377,7 +1387,7 @@ channel, writing to the owned channel and reading from an owned channel:
 \begin{verbatim}
 type OChan a = Own (Chan a)
 
-newOChan    :: OChan a
+newOChan   :: OChan a
 writeOChan :: Typeable a => OChan a -> ORef a -> Own ()
 readOChan  :: Typeable a => OChan a -> Own (ORef a)
 \end{verbatim}

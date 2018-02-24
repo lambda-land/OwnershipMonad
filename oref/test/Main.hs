@@ -331,7 +331,8 @@ nestedResources :: MVar Int -> MVar Int -> IO ()
 nestedResources outerResource innerResource = do
   modifyMVar_ outerResource $ \outer -> do
       yield
-      modifyMVar_ innerResource $ \inner -> return (inner + 1)
+      modifyMVar_ innerResource $
+                     \inner -> return (inner + 1)
       return (outer + 1)
   return ()
 
@@ -348,7 +349,8 @@ nestedORef :: ORef Int -> ORef Int -> Own ()
 nestedORef outerRef innerRef = do
   borrowORef' outerRef $ \outer -> do
     liftIO $ yield
-    borrowORef' innerRef $ \inner -> return (inner + 1)
+    borrowORef' innerRef $
+                  \inner -> return (inner + 1)
     return (outer + 1)
   return ()
 

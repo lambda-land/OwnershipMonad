@@ -78,9 +78,9 @@ regularChan = do
 -- The previous example but with owned channels
 introOChan :: IO (Either String ())
 introOChan = startOwn $ do
-  ref <- newORef "test"
-  ch <- newOChan
-  writeOChan' ch ref
+  ref <- newORef "resource"
+  let ch = newOChan
+  writeOChan ch ref
 
   let down :: String -> Own String
       down x = return (map toLower x)
@@ -90,9 +90,9 @@ introOChan = startOwn $ do
 
   _ <- liftIO $ forkIO $ do
     _childResult <- startOwn $ do
-      ref' <- readOChan' ch
+      ref' <- readOChan ch
       borrowORef' ref' down
-      writeOChan' ch ref'
+      writeOChan ch ref'
     return ()
 
   borrowORef' ref up
