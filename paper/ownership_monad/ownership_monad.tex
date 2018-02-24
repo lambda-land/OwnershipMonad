@@ -35,6 +35,15 @@ for Haskell that implements an
 introduces a set of rules that govern how, when, and by whom a resource within
 what is called an \textit{Owned Reference} (an \texttt{ORef}) can be used.
 
+When an owned reference is created it is bound to a resource.
+The resource is placed within an entry which is then stored in the state of the
+ownership monad.
+At the same time this occurs, the entry becomes the referent to a uniquely
+identifiable variable ID.
+This variable becomes the way to refer to and access the contents of the
+resource it is bound to inside the ownership monad.
+Each referent can only have, at most, one variable binding at a time.
+
 While the restrictions this implementation imposes may seem to increase the
 complexity of writing programs, the resulting guarantees offer improvements in
 specific areas.
@@ -53,19 +62,14 @@ Referential transparency is a desirable property which allows for a greater
 ability to reason about the behavior and correctness of a program.
 Even in a pure language like Haskell, this property breaks down in the context
 of concurrency.
-% In order to allow separate threads to communicate the basic
-% mechanisms provided by Concurrent Haskell introduce mutable state.
-% Adding mutable state and sharing it between threads explicitly introduces
-% side-effects into otherwise pure and referentially transparent computations.
-% TODO change this portion
 Under these circumstances, Haskell's usual approach of segregating side-effects
 into monadic computations does not resolve every issue that can exist with
 shared-state concurrency.
 
 \newpage
 
-A race condition can be created when a mutable reference is shared
-across a channel between two threads:
+A simple example of this is the race condition that can be created when a
+mutable reference is shared across a channel between two threads:
 
 \begin{verbatim}
 import Data.IORef
@@ -110,8 +114,8 @@ mutable structures. However categories of problems still exist where a
 mutable structure is required.
 
 The \texttt{OChan} and \texttt{ORef} operations provided by this report's library
-allow a user to detect situations similar to the one created by the previous
-example which would result in a race condition.
+allow a user to detect situations, similar to the one created by the previous
+example, which would result in a race condition.
 A comparable program using the abstractions provided by the ownership system
 would be able to detect the race condition before it occurred:
 
@@ -139,6 +143,7 @@ introOChan = startOwn $ do
   return ()
 \end{verbatim}
 
+
 Here a resource is created and placed within an \texttt{ORef}.
 The parent thread proceeds to give up ownership of the \texttt{ORef} when it
 writes it to the owned channel.
@@ -147,9 +152,12 @@ ownership over its contents.
 The child thread can then mutate the resource in a borrow operation before
 writing it back to the channel. 
 
+Each of the ownership operations used in this example will be defined
+and discussed at greater length later on.
 This example demonstrates a sequence of actions that result in an ownership
-violation. The issue being that the parent thread tries to use a reference
-that it has already given up ownership by writing to a channel.
+violation.
+This violation is occurs when parent thread tries to use a reference that it
+has already given up ownership over by writing the reference to a channel.
 
 When the overall example is evaluated it will result in a \texttt{Left} value
 which will indicate the kind of ownership violation which took place.
@@ -1534,7 +1542,7 @@ resource use and detect violations.
 This project report has demonstrated a monadic library-based approach for
 tracking resources.
 Resource management done in this way allows a user to detect when a program
-tries to a use a resource with more than one referent.
+tries to a use a resource in a referent with more than one variable binding.
 
 Other languages have approached resource management with similar
 solutions: notably language level support for ownership typing in Rust as well
