@@ -1171,10 +1171,10 @@ continueOwn x = do
   liftIO $ runEitherT (evalStateT x s)
 \end{verbatim}
 
-There may be functions which operate in the ownership monad which a user would
-like to run in a separate thread.
+Functions which operate in the ownership monad, or small ownership expressions,
+might exist which a user would like to run in a separate thread.
 The \texttt{forkOwn} function provides a way for an ownership expression to be
-sent to be evaluated in a separate thread.
+evaluated in a separate thread.
 
 \begin{verbatim}
 forkOwn :: Own a -> Own ()
@@ -1448,7 +1448,7 @@ In order to write the resource inside the \texttt{ORef} to a traditional
 channel, within the owned channel operation, the function writing the resource
 to the channel needs to borrow the resource.
 This might seem odd since it would appear that the function borrowing access
-ot the resource intends to send the resource to another thread.
+to the resource intends to send the resource to another thread.
 This is accurate, the resource that was written to the channel will not be
 returned and under the rules for a borrow this kind of use is allowed.
 This is similar to a resource being duplicated using the copy operation, the
@@ -1456,19 +1456,17 @@ only difference is that the function which is borrowing access
 performs an \texttt{IO} operation to send a copy of the resource to the
 channel.
 
-This step would not seem to be of tremendous consequence if it were not for the
-fact that the function borrowing the resource is sharing the resource
-to other threads and different ownership monads.
-This step occurs inside the larger owned channel write operation and will
+This step stands out because the function borrowing the resource is sharing
+it with other threads and with different ownership monads.
+However, this step occurs inside the larger owned channel write operation and will
 be opaque to the user of the library.
+
 When the resource has been written to the channel it will still exist in the
 original thread.
-This issue is resolved in the next \texttt{ORef} operation which
-makes up the \texttt{writeChan} function.
-
-The second \texttt{ORef} operation is to drop the \texttt{ORef} that was just
-borrowed. This immediately follows the completion of the borrow operation. The
-borrow operation used the underlying resource in order to send it to the channel.
+This is resolved in the next \texttt{ORef} operation which is to drop
+the \texttt{ORef} that was just borrowed.
+This immediately follows the completion of the borrow operation which used the
+underlying resource in order to send it to the channel.
 Upon completion, as far as the ownership monad for that thread is
 concerned, the \texttt{ORef} has been consumed.
 \footnote{The value sent across the channel will not be in an IORef.
@@ -1481,6 +1479,8 @@ This will update the resource ledger for that monad - crucially without
 touching the resource itself.
 This prevents any further operations from using the resource
 in that thread.
+
+\newpage
 
 \begin{lstlisting}
 singleThreadedWrite :: Own ()
@@ -1536,7 +1536,7 @@ readOChan' ch = do
 
 Within the read operation a resource is first read from the traditional
 channel.
-This retrieves and removes the resource from the channel which prevents other
+This retrieves and removes the resource from the channel - which prevents other
 threads from then reading that resource.
 
 The second operation is to place the freshly acquired resource inside a new
