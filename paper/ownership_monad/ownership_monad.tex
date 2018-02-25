@@ -1067,7 +1067,7 @@ internally is:
 type Own a = StateT (ID,Store) (EitherT String IO) a
 \end{verbatim}
 
-% TODO explain EitherT as well as IO
+% TODO explain EitherT as well as IO ?
 
 State is represented using the \texttt{StateT} monad transformer.
 The ownership monad needs to track the state of ownership system operations
@@ -1482,16 +1482,32 @@ touching the resource itself.
 This prevents any further operations from using the resource
 in that thread.
 
-Even though a read operation seems suitable for the write operation, the borrow
-operation on owned references is used instead.
-This is in order to ensure that the actual value in the owned reference is
+\begin{lstlisting}
+singleThreadedWrite :: Own ()
+singleThreadedWrite = do
+  ref <- newORef ""
+  writeORef ref "Quark"
+  let ch = newOChan
+  writeOChan ch ref
+  writeORef ref "Odo"
+  -- ^^ writing to a ref that's no longer owned
+\end{lstlisting}
+
+This example will evaluate to a \texttt{Left} value which identifies a
+violation caused by a \texttt{writeORef} operation in this monad.
+After the \texttt{ORef}, named \texttt{ref}, is written to the owned channel on
+line 6 it no longer exists within this ownership environment.
+For that reason when the expression tries to use \texttt{ref} on line 7, an
+ownership violation is detected.
+
+A write operation should totally consume the resource.
+Even though a read operation seems suitable for the first internal step in a
+write operation, the borrow operation on owned references is used instead.
+This is done in order to ensure that the actual value in the owned reference is
 being used and sent across the channel.
 The read operation would report what the value was at the time of reading it but
 other functions could then mutate it in quick succession after the read is
 complete. % but after a borrow this could happen as well ...
-A write operation should totally consume the resource.
-In order to ensure this, the borrow operation is used within
-the write operation.
 
 \subsection{Reading from an Owned Channel}
 
@@ -1528,8 +1544,43 @@ The second operation is to place the freshly acquired resource inside a new
 final ownership monad context.
 The thread which performed the read operation will now have access to the
 \texttt{ORef} and will be able to manipulate the value inside it using the
-provided operations for owned references.
+provided operations for owned references. \\
 
+\begin{lstlisting}
+chanTest :: Own ()
+chanTest = do
+  ch <- newOChan
+  ref <- newORef ""
+  writeORef ref "Quark"
+  writeOChan' ch ref
+  _childThrID <- forkOwn $ do
+    -- in the child thread
+    childRef <- readOChan' ch
+    val <- readORef childRef
+    liftIO $ putStrLn $ "Child thread received: " ++ val
+    liftIO $ do 
+      yield
+      threadDelay 3000000  -- 3 seconds
+    writeOChan' ch childRef
+    return ()
+  -- back in the parent thread
+  newParentRef <- readOChan' ch
+  writeORef newParentRef "Odo"
+  return ()
+\end{lstlisting}
+
+The previous example shows a set of operations that will not create an ownership
+violation. In this example an owned channel is created in the parent thread and
+an owned reference is written to the channel.
+This will remove that reference from the parent environment.
+The thread is then forked with \texttt{forkOwn} which will evaluate the
+ownership expression passed to it in a child thread.
+The child thread reads the owned reference from the channel and prints it.
+Even though the child thread then delays for three seconds (line 14) before
+writing the reference back to the owned channel, there will not be an ownership
+violation in the parent thread.
+The parent thread regains ownership over the reference by reading it from the
+owned channel an is able to operate on it once again.
 
 \subsection{Creating an Owned Channel}
 

@@ -359,7 +359,7 @@ deadlockORef = do
   orefA <- newORef 0
   orefB <- newORef 0
   forkOwn $ nestedORef orefA orefB
-  liftIO $ threadDelay 1000 -- Wait a second just so that the output is printed nicely
+  liftIO $ threadDelay 1000000 -- Wait a second just so that the output is printed nicely
   forkOwn $ nestedORef orefB orefB
   return ()
 
@@ -456,10 +456,10 @@ main = do
   dlmv <- deadlockMVar
   putStrLn $ show dlmv
 
-  threadDelay 1000
+  threadDelay 1000000
 
   putStrLn "\nORef deadlock example:"
   -- this should fail - not with an exception but with a Left String
   dlor <- startOwn deadlockORef :: IO (Either String ())
-  threadDelay 1000
+  threadDelay 1000000
   putStrLn $ show dlor

@@ -5,59 +5,16 @@ import Control.Monad.IO.Class (liftIO)
 import Data.IORef
 import Data.Char (toLower, toUpper)
 
-import qualified Data.ByteString.Char8 as S8
-import Data.Text (Text, pack)
-import Data.Text.Encoding (encodeUtf8)
-import Control.Monad (forever)
-import Control.Concurrent.Async
+-- import qualified Data.ByteString.Char8 as S8
+-- import Data.Text (Text, pack)
+-- import Data.Text.Encoding (encodeUtf8)
+-- import Control.Monad (forever)
+-- import Control.Concurrent.Async
 
 import Data.ORef
 import Control.Concurrent.OChan
 
-
-singleThreadedWrite :: Own ()
-singleThreadedWrite = do
-  -- create an ORef in the context of this thread and ownership monad
-  ref <- newORef ""
-  -- write to it
-  writeORef ref "Quark"
-
-  -- create a new channel
-  let ch = newOChan
-  -- write the oref to the channel -- this removes the oref from the context
-  writeOChan ch ref
-
-  writeORef ref "Odo"
-  -- ^^ writing to a ref that's no longer owned
-
-
--- | A simple example using ORef's and OChan's to show a set of operations that
--- will succeed.
-chanTest :: Own ()
-chanTest = do
-  -- create a new channel
-  ch <- newOChan
-  -- create an ORef in the context of this thread and ownership monad
-  ref <- newORef ""
-  -- write to it
-  writeORef ref "Quark"
-  -- write the oref to the channel (removing it from this context)
-  writeOChan' ch ref
-  -- fork the thread
-  _ <- liftIO $ forkIO $ do
-    ex <- startOwn $ do
-      -- we use startOwn here because we are in a new ownership context
-      -- the child thread can read from the channel
-      _ <- readOChan' ch
-      -- this places ownership of the resource in the channel within the
-      -- context of the child thread
-      return ()
-    case ex of -- TODO make sure to get the output to the test log file
-      Left err -> do putStrLn ("Error" ++ err)
-      Right _ -> do putStrLn "Success"
-  return ()
-
--- An example from the paper of regular channels passing a mutable reference
+-- An example from the paper of regular channels passing a mutable reference.
 regularChan :: IO ()
 regularChan = do
   ref <- newIORef "test"
@@ -75,7 +32,7 @@ regularChan = do
   newVal <- readIORef ref
   putStrLn newVal
 
--- The previous example but with owned channels
+-- The previous example from the paper but with owned channels.
 introOChan :: IO (Either String ())
 introOChan = startOwn $ do
   ref <- newORef "resource"
@@ -96,6 +53,55 @@ introOChan = startOwn $ do
     return ()
 
   borrowORef' ref up
+  return ()
+
+
+-- Used as an example in the paper for the writeOChan operation.
+singleThreadedWrite :: Own ()
+singleThreadedWrite = do
+  -- create an ORef in the context of this thread and ownership monad
+  ref <- newORef ""
+  -- write to it
+  writeORef ref "Quark"
+
+  -- create a new channel
+  let ch = newOChan
+  -- write the oref to the channel -- this removes the oref from the context
+  writeOChan ch ref
+
+  writeORef ref "Odo"
+  -- ^^ writing to a ref that's no longer owned
+
+
+
+
+-- | A simple example using ORef's and OChan's to show a set of operations that
+-- will succeed.
+chanTest :: Own ()
+chanTest = do
+  -- create a new channel
+  ch <- newOChan
+  -- create an ORef in the context of this thread and ownership monad
+  ref <- newORef ""
+  -- write to it
+  writeORef ref "Quark"
+  -- write the oref to the channel (removing it from this context)
+  writeOChan' ch ref
+  -- fork the thread
+  _childThrID <- forkOwn $ do
+    childRef <- readOChan' ch
+    -- this places ownership of the resource in the channel within the
+    -- context of the child thread
+    val <- readORef childRef
+    liftIO $ putStrLn $ "Child thread received: " ++ val
+    liftIO $ do
+      yield
+      threadDelay 3000000 -- Wait three seconds to delay writing back
+    writeOChan' ch childRef
+    return ()
+  -- back in the parent thread
+  newParentRef <- readOChan' ch
+  writeORef newParentRef "Odo"
   return ()
 
 
@@ -121,7 +127,7 @@ mutableOChanTest = do
 
   -- fork the thread
   _ <- liftIO $ forkIO $ do
-    ex <- startOwn $ do
+    _ex <- startOwn $ do
       -- we use startOwn here because we are in a new ownership context
       -- the child thread can read from the channel
       oref <- readOChan' ch
@@ -148,7 +154,6 @@ mutableOChanTest = do
           putStrLn contents
     )
   return ()
-
 
 -- | An example of why a forked process needs to use a channel for resource
 -- access instead of accessing it through the parent thread
