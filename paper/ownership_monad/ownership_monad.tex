@@ -19,8 +19,7 @@
 \usepackage{listings} % For code examples
 
 % set listings env settings
-\lstset{basicstyle=\ttfamily, frame=single, language=Haskell, numbers=left }
-% \lstset{basicstyle=\ttfamily, language=Haskell, numbers=left }
+\lstset{basicstyle=\ttfamily, frame=single, language=Haskell, numbers=left, showstringspaces=false }
 % \lstset{ language=Haskell, numbers=left}
 
 
@@ -557,13 +556,13 @@ dropORef oref = do
 Any further operations that try to use the dropped reference will be prevented
 from occurring:
 
-\begin{verbatim}
+\begin{lstlisting}
 startOwn $ do
   ref <- newORef "hello"
   dropORef ref
   _copy <- copyORef ref
   return ()
-\end{verbatim}
+\end{lstlisting}
 
 The copy operation in this example expression will not create a copy of a
 dropeed reference.
@@ -638,7 +637,7 @@ now two separate and different resources.
 This property can be observed when a reference is copied (creating another
 reference) and then the original reference is mutated:
 
-\begin{verbatim}
+\begin{lstlisting}
 startOwn $ do
   x <- newORef (1 :: Int)
   y <- copyORef x
@@ -648,7 +647,7 @@ startOwn $ do
   xContents <- readORef x
   yContents <- readORef y
   return (xContents, yContents)
-\end{verbatim}
+\end{lstlisting}
 
 This expression will evaluate to \texttt{Right (2,1)}.
 After the reference \texttt{y} was created by making a copy of
@@ -782,13 +781,13 @@ A moved resource by comparison doesn't change.  Instead what is altered is the
 record of who owns that resource.  Neither operation, moving and copying,
 creates a situation where more than one reference owns a resource.
 
-\begin{verbatim}
+\begin{lstlisting}
 startOwn $ do
   x <- newORef "greeting"
   y <- moveORef x
   yContents <- readORef y
   return yContents
-\end{verbatim}
+\end{lstlisting}
 
 This expression does not violate the ownership rules and will evaluate
 to \texttt{Right ``greeting''}.
@@ -796,14 +795,14 @@ If, for example, an expression tried to use a moved resource through an
 old reference binding, the expression will evaluate to a \texttt{Left} value
 such as for the following code:
 
-\begin{verbatim}
+\begin{lstlisting}
 startOwn $ do
   x <- newORef "greeting"
   y <- moveORef x
   xContents <- readORef x
   yContents <- readORef y
   return (xContents, yContents)
-\end{verbatim}
+\end{lstlisting}
 
 This expression violates the ownership system rules and will evaluate to
 a \texttt{Left} because the first \texttt{readORef} operation used is
@@ -822,12 +821,12 @@ will be destructively updated with the new contents. This expression does
 not violate any ownership rules and will evaluate
 to \texttt{Right ``Some new contents''}. 
 
-\begin{verbatim}
+\begin{lstlisting}
 startOwn $ do
   ref <- newORef "Original contents"
   writeORef ref "Some new contents"
   readORef ref
-\end{verbatim}
+\end{lstlisting}
 
 Write operations will follow the ownership rules. Consequently the operation
 will not allow a resource to be updated if the reference no longer exists.
@@ -836,13 +835,13 @@ write operation the expression will evaluate to a \texttt{Left} value.
 The ownership monad will prevent the write operation from occuring because
 a dropped entry will no longer be writable.
 
-\begin{verbatim}
+\begin{lstlisting}
 startOwn $ do
   ref <- newORef "Original contents"
   dropORef ref
   writeORef ref "Some new contents"
   readORef ref
-\end{verbatim}
+\end{lstlisting}
 
 The value within the resource can be updated and changed through the reference
 that owns the resource.
@@ -886,21 +885,22 @@ temporarily to be able to inspect its current contents in a print statement.
 While the resource is lent out other operations will be prevented from using the
 reference.
 
-\begin{verbatim}
+\begin{lstlisting}
 startOwn $ do
   x <- newORef "Hello from inside the reference"
   let f :: String -> Own ()
-      f a = liftIO $ putStrLn $ "The contents of the ORef is: " ++ a
+      f a = liftIO $ 
+             putStrLn $ "The contents of the ORef is: " ++ a
   _ <- borrowORef x f
   return ()
-\end{verbatim}
+\end{lstlisting}
 
 The previous expression will evaluate to \texttt{Right ()} and the contents
 of the reference will be printed to standard output.
 This would also be the outcome in a situation in which a long running function
 borrowed the resource.
 
-\begin{verbatim}
+\begin{lstlisting}
 startOwn $ do
   x <- newORef "Hello from inside the reference"
   let f :: String -> Own ()
@@ -910,7 +910,7 @@ startOwn $ do
   _ <- borrowORef x f
   contents <- readORef x
   return contents
-\end{verbatim}
+\end{lstlisting}
 
 Because of the monadic sequencing of operations in a single thread,
 the outcome of a long acting function borrowing a function will be the same
@@ -936,8 +936,8 @@ borrowORef oref k = do
       False -> lift $
         left "Error during borrow operation.\
              \ The checks for if the entry was in the same thread\
-             \ as the borrow operation and if the entry could be written to\
-             \ returned false."
+             \ as the borrow operation and if the entry could be\
+             \ written to returned false."
       True -> do
         setORefLocked oref
         v <- getValue oref
@@ -1029,10 +1029,10 @@ operation will take a snapshot of the current contents. The snapshot is returned
 but no guarantees can be made about the current contents of the \texttt{ORef}
 after the read operation has completed.
 
-\begin{verbatim}
+\begin{lstlisting}
 box <- newORef True
 schrodingers_cat_alive <- readORef box
-\end{verbatim}
+\end{lstlisting}
 
 Reading from an \texttt{ORef} will reveal what the contents of the \texttt{ORef}
 was at the time the read was performed but the \texttt{ORef} will continue to
@@ -1320,17 +1320,17 @@ resource across a channel to relinquish ownership over the resource.
 A thread reading a resource from the channel will automatically gain ownership
 over the resource it consumes from the channel.
 
-Once a thread has sent a resource over the channel all operations in the thread
-will need to be prevented from using that resource.
-If the thread later needed to use the resource again, it would have to read the
+Once a thread has sent a resource over the channel,
+later operations in the thread will be prevented from using that resource.
+If the thread needed to use the resource again, it would have to read the
 resource from a channel and reclaim ownership over the resource.
 
 \subsection{Motivation}
 
 With traditional concurrent channels, the thread that originally wrote
-a resource to a channel would retain access to the resource. This is because the
-variable bound to the resource is still valid in the scope of the code which wrote
-to the channel.
+a mutable resource to a channel would retain access to the resource. This is
+because the variable bound to the resource is still valid in the scope of the
+code which wrote to the channel.
 
 As a result it would be perfectly legal to write code that later referred to the
 resource through an existing variable binding in the original thread.
@@ -1343,26 +1343,29 @@ thread) owns a resource.
 
 \subsection{Using Owned References to Construct Owned Channels}
 
-As discussed earlier, the functions to operate on owned references enforce the
-rules generalizing resource ownership and how resources may be used within the
-context of the ownership monad.
-It is possible to use the resources in owned references safely knowing that any
-violations of the ownership rules will be detected and prevented.
-For that reason owned references provide a useful building block for constructing
+As discussed earlier, the functions to operate on owned references enforce
+how resources may be used within the context of the ownership monad.
+It is possible to use the resources in owned references safely, knowing that any
+violations of the ownership rules will be detected.
+For that reason, owned references provide a useful building block for constructing
 larger abstractions that are concerned with tracking resource ownership.
 
 One such area of concern is how to enable expressions in separate
 threads to access the same resource.
 Multiple (potentially mutable) concurrent expressions can evaluate a shared
 resource as long as they do not do so simultaneously.
+It is well understood that problems arise when threads attempt to access a
+shared resource without a control mechanism.
+Likewise, a deadlock situation can accidentally be created
+when access to shared resources is hoarded by a single thread.
 As the chapter introduction alluded, one solution to this problem is to
-create a system for shared access to resources between channels which tracks
-both what the resource is and who can own the resource.
+create a system for sharing access to resources between channels which tracks
+both what the resources are as well as who owns the resources.
 
 Using owned references as a building block it is quite easy to create
 such a system.  Additionally it is possible to do so on top of the existing
 channel interface and the concurrency abstractions which the base libraries
-provide in Haskell.
+in Haskell provide.
 
 \section{Owned Channel Operations}
 
@@ -1392,9 +1395,9 @@ writeOChan :: Typeable a => OChan a -> ORef a -> Own ()
 readOChan  :: Typeable a => OChan a -> Own (ORef a)
 \end{verbatim}
 
-The owned channel operations detect ownership violations and prevent the
-accidental shared ownership of a resource from occurring.
-This allow each thread to be able to acquire or give up ownership of resources
+Owned channel operations detect ownership violations and prevent the
+accidental shared ownership of a resource.
+This allows each thread to be able to acquire or give up ownership of resources
 in a safe manner. The read and write operations will only allow the user to
 read or write references to the channel. Read and write operations are also
 restricted to the context of the ownership monad.
@@ -1403,7 +1406,7 @@ restricted to the context of the ownership monad.
 
 Writing to an owned channel takes the contents of an \texttt{ORef} in
 one thread and writes it to the channel - the shared state between the threads.
-From the view-point of the thread that wrote to the channel this operation
+From the view-point of the thread that wrote to the channel, this operation
 consumes the \texttt{ORef} and the thread loses the ability to further use the
 \texttt{ORef} in later operations.
 
@@ -1415,8 +1418,8 @@ writeOChan ch oref = ch >>= (\x -> writeOChan x oref)
 The \texttt{writeOChan} function takes an owned channel and writes the
 resource to it. Because the owned reference only exists within the
 ownership monad it is not necessary for resource safety to use
-an \texttt{OChan} and a regular \texttt{Chan} type can be used in it's place
-if it is used in combination the \texttt{writeOChan'} function.
+an \texttt{OChan} and a regular \texttt{Chan} type can be substituted
+in it's place if used in combination with the \texttt{writeOChan'} function.
 Using an \texttt{OChan} with \texttt{writeOChan} saves the user
 from having to lift the regular channel out of the IO monad within their
 ownership monad expression and is provided for convenience.
@@ -1442,59 +1445,60 @@ If those conditions are satisfied then the first of the two \texttt{ORef}
 operations can occur.
 
 In order to write the resource inside the \texttt{ORef} to a traditional
-channel, inside the owned channel, the function writing the resource to the
-channel needs to borrow the resource.
-This might seem odd since it would appear that the borrower function does not
-intend to ever return the resource.  This is accurate, the resource that was
-written to the channel will not be returned and under the rules for a
-borrow this kind of use is actually allowed.
+channel, within the owned channel operation, the function writing the resource
+to the channel needs to borrow the resource.
+This might seem odd since it would appear that the function borrowing access
+ot the resource intends to send the resource to another thread.
+This is accurate, the resource that was written to the channel will not be
+returned and under the rules for a borrow this kind of use is allowed.
+This is similar to a resource being duplicated using the copy operation, the
+only difference is that the function which is borrowing access 
+performs an \texttt{IO} operation to send a copy of the resource to the
+channel.
 
+This step would not seem to be of tremendous consequence if it were not for the
+fact that the function borrowing the resource is sharing the resource
+to other threads and different ownership monads.
 This step occurs inside the larger owned channel write operation and will
 be opaque to the user of the library.
-There would not seem to be an issue if it were not for the fact that
-the borrower function acts on resources shared between threads and different
-ownership monads.  Because the resource is being used in the borrow step in a
-way which sends it elsewhere it is a clear violation of the ownership rules and
-one which will not be caught. When the resource has been written to the channel
-it will also still exist in the original thread. This issue is resolved in the
-next operation which makes up writes to owned channels.
+When the resource has been written to the channel it will still exist in the
+original thread.
+This issue is resolved in the next \texttt{ORef} operation which
+makes up the \texttt{writeChan} function.
 
 The second \texttt{ORef} operation is to drop the \texttt{ORef} that was just
 borrowed. This immediately follows the completion of the borrow operation. The
 borrow operation used the underlying resource in order to send it to the channel.
 Upon completion, as far as the ownership monad for that thread is
-concerned, the \texttt{ORef} no longer has any functions using the reference
-when the previous borrow operation is complete.
-\footnote{Since the borrow just performed a dangerous multi-threaded IO operation
-  it is not entirely true to say that it does not have any borrowers - the
-  subsequent drop operation however makes this irrelevant.}
+concerned, the \texttt{ORef} has been consumed.
+\footnote{The value sent across the channel will not be in an IORef.
+  The borrow operation allows a function act on the contents of the IORef in
+  an ORef entry but not the IORef itself.}
 
 Because the \texttt{ORef} no longer has any functions using it, it is now
 possible to drop it from that monad using the \texttt{ORef} drop operation.
 This will update the resource ledger for that monad - crucially without
 touching the resource itself.
-% TODO this may no longer be true.
-% Drop operations now affect the IORef - but does this affect multithreaded
-% IORef's??
-% I don't think so because the borrow is making an immutable copy.
-% This is worth testing though.
 This prevents any further operations from using the resource
 in that thread.
 
-The borrow operation on owned references is used instead of the read operation
-in order to ensure that the actual value in the owned reference is being used
-and sent across the channel. The read operation would report what the value
-was at the time of reading it but other functions could then mutate it
-in quick succession after the read is complete.
-A write operation should totally consume the resource and in order to ensure
-this the borrow operation is used within the write operation.
+Even though a read operation seems suitable for the write operation, the borrow
+operation on owned references is used instead.
+This is in order to ensure that the actual value in the owned reference is
+being used and sent across the channel.
+The read operation would report what the value was at the time of reading it but
+other functions could then mutate it in quick succession after the read is
+complete. % but after a borrow this could happen as well ...
+A write operation should totally consume the resource.
+In order to ensure this, the borrow operation is used within
+the write operation.
 
 \subsection{Reading from an Owned Channel}
 
 Reading from an owned channel can be thought of as the reverse of writing to an
-owned channel.  Rather than take the contents of an \texttt{ORef} and give away
-ownership of the resource inside it
-- by writing the resource to a channel -
+owned channel.
+Rather than sending the contents of an \texttt{ORef} to another thread and giving 
+up ownership of the resource,
 we are instead taking ownership of a resource from the channel and encapsulating
 it within a new \texttt{ORef}.
 
@@ -1504,7 +1508,8 @@ readOChan oc = oc >>= readOChan
 \end{verbatim}
 
 A normal channel can be used with the \texttt{readOChan'} function because
-the reference which is read from the channel will. 
+the reference which is read from the channel will remain within the context
+of the ownership monad. 
 
 \begin{verbatim}
 readOChan' :: Typeable a => Chan a -> Own (ORef a)
@@ -1515,12 +1520,12 @@ readOChan' ch = do
 
 Within the read operation a resource is first read from the traditional
 channel.
-This retrieves the resource from the channel and removes it from the channel
-which prevents other threads from then reading that resource.
+This retrieves and removes the resource from the channel which prevents other
+threads from then reading that resource.
 
 The second operation is to place the freshly acquired resource inside a new
 \texttt{ORef}.  This \texttt{ORef} will then be returned into the
-ownership monad context.
+final ownership monad context.
 The thread which performed the read operation will now have access to the
 \texttt{ORef} and will be able to manipulate the value inside it using the
 provided operations for owned references.
@@ -1541,9 +1546,9 @@ newOChan = do
 
 It was noted earlier that there are write and read functions provided
 in the \texttt{OChan} library that can operate on normal \texttt{IO} bound
-channels.  Using a regular channel in the ownership monad with the write and
-read operation for owned references provides the same ability to reason about
-resource use and detect violations.
+channels.  Using a regular channel in the ownership monad,
+with the write and read operation for owned channels,
+provides the same ability to reason about resource use and detect violations.
 
 
 
