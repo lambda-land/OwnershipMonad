@@ -33,9 +33,6 @@
   threads.
   Further concurrency tools such as channels provide abstractions on top of
   these.
-  % More sophisticated runtime-orientated tools like software transactional memory
-  % further abstract away a user's ability to introduce subtle concurrency bugs
-  % that are made possible with direct access to mutable variables. % I think
   Without resorting to more sophisticated runtime-orientated libraries,
   the tools to create mutable resources - such as IORef's and MVar's - do not provide
   a way to track resource use in concurrent programs other than in an ad hoc fashion.
