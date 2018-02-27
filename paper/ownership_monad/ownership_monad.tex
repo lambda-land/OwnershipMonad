@@ -17,22 +17,24 @@
   In Haskell, a purely functional language, data is usually immutable.
   In a simplistic view this means that existing resources remain unchanged and
   new copies are created in order to modify values in a program and effect change.
+
   This is a strong aspect of Haskell and purely functional programming.
-   
-  In almost every circumstance Haskell programmers can use immutable data and
-  purely functional data structures to compose their programs.
-  However, some situations exist in which explicitly mutable resources are
+  In almost every circumstance Haskell programmers can use immutable data
+  and purely functional data structures to compose their programs.
+  However, some situations remain in which explicitly mutable resources are
   required. 
   For example: when simultaneous concurrent threads in a program evaluate
   expressions, they often need to operate on a shared resource.  Because
   these threads are separate, the order in which the resource is operated
   on cannot be guaranteed.
+  As a result of this subtle problems can be introduced to programs which are often
+  difficult to reproduce and debug.
   
   The basic mutable variables provided in the base libraries of Haskell, such
   as IORef's and MVar's can be used as a way to share a resource between
   threads.
   Further concurrency tools such as channels provide abstractions on top of
-  these.
+  these tools.
   Without resorting to more sophisticated runtime-orientated libraries,
   the tools to create mutable resources - such as IORef's and MVar's - do not provide
   a way to track resource use in concurrent programs other than in an ad hoc fashion.
@@ -49,7 +51,7 @@
   Owned references within the ownerhip monad are then used construct
   Owned Channels,
   an abstraction which sends ownership over an underlying resource to
-  a thread in addition to the resource itself.
+  a thread, in addition to the resource itself.
 }
 
 \acknowledgements{
