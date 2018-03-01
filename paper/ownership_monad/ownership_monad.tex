@@ -12,46 +12,28 @@
 \commencementyear{TODO commencement year}
 
 \abstract{
-  % Resource use is central to computation, from the
-  % Von Neumann architecture onwards to modern computing systems.
-  In Haskell, a purely functional language, data is usually immutable.
-  In a simplistic view this means that existing resources remain unchanged and
-  new copies are created in order to modify values in a program and effect change.
-
-  This is a strong aspect of Haskell and purely functional programming.
-  In almost every circumstance Haskell programmers can use immutable data
-  and purely functional data structures to compose their programs.
-  However, some situations remain in which explicitly mutable resources are
-  required. 
-  For example: when simultaneous concurrent threads in a program evaluate
-  expressions, they often need to operate on a shared resource.  Because
-  these threads are separate, the order in which the resource is operated
-  on cannot be guaranteed.
-  As a result of this, subtle problems can be introduced to programs which are often
-  difficult to reproduce and debug.
   
-  The basic mutable variables provided in the base libraries of Haskell, such
-  as IORef's and MVar's can be used as a way to share a resource between
-  threads.
-  Further concurrency tools such as channels provide abstractions on top of
-  these tools.
-  Without resorting to more sophisticated runtime-orientated libraries,
-  the tools to create mutable resources - such as IORef's and MVar's - do not provide
-  a way to track resource use in concurrent programs other than in an ad hoc fashion.
+  The Rust programming language is a systems programming language with a
+  strong static type system.
+  A central feature of Rust's type system is its unique concept of ``ownership''.
+  This concept builds off of Affine types and allows the user to safely mutate
+  resources by restricting resource ownership to at most one variable binding
+  at a time.
+  In large part because of this, the Rust language is able to give a user safe
+  low level control over resources while forgoing garbage collection and the
+  overhead of a runtime.
+  In Haskell data is immutable and many of the problems addressed by
+  ownership in Rust are resolved in Haskell with referential transparency.
+  This project report introduces the Ownership Monad, a monad which implements
+  aspects of the ownership system as a library in Haskell.
+  This will demonstrate many of rules enforced by the ownership system in Rust
+  in order to better understand the ownership based method of tracking
+  resources.  This report will further explore the benefits such a system
+  can provide for tracking resource use between concurrent threads.
   
-  This project report introduces the Ownership Monad, a monad for tracking
-  resource use. This project draws upon ownership typing in the Rust programming
-  language as well as uniqueness typing in the Idris programming language.
-  Resources placed within owned references, variable references in the Ownership
-  monad, are tracked.
-  While these references are internally mutable, strict rules are enforced for
-  how they can be used.
-  These rules are derived from Affine logic and provide the basis for how
-  correct resource use can be reasoned about in the ownership monad.
-  Owned references within the ownerhip monad are then used construct
-  Owned Channels,
-  an abstraction which sends ownership over an underlying resource to
-  a thread, in addition to the resource itself.
+  % Owned references within the ownerhip monad are then used construct
+  % Owned Channels, an abstraction which sends ownership over an underlying
+  % resource to a thread, in addition to the resource itself.
 }
 
 \acknowledgements{
