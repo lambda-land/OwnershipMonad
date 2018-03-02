@@ -12,28 +12,21 @@
 \commencementyear{TODO commencement year}
 
 \abstract{
-  
   The Rust programming language is a systems programming language with a
   strong static type system.
-  A central feature of Rust's type system is its unique concept of ``ownership''.
-  This concept builds off of Affine types and allows the user to safely mutate
-  resources by restricting resource ownership to at most one variable binding
-  at a time.
-  In large part because of this, the Rust language is able to give a user safe
-  low level control over resources while forgoing garbage collection and the
-  overhead of a runtime.
-  In Haskell data is immutable and many of the problems addressed by
-  ownership in Rust are resolved in Haskell with referential transparency.
-  This project report introduces the Ownership Monad, a monad which implements
-  aspects of the ownership system as a library in Haskell.
-  This will demonstrate many of rules enforced by the ownership system in Rust
-  in order to better understand the ownership based method of tracking
+  A central feature of Rust's type system is its unique concept of ``ownership'',
+  which enables Rust to give a user safe, low-level control over resources
+  without the overhead of garbage collection.
+  In Haskell, most data is immutable and many of the problems addressed by
+  ownership in Rust simply don't arise.
+  However, ownership is still useful in Haskell in the context of mutable
+  references and concurrency.
+  This project report introduces the Ownership Monad, a monad that implements
+  aspects of Rust's ownership system as a library in Haskell.
+  This will demonstrate many of the rules enforced by the ownership system in
+  Rust in order to better understand the ownership-based method of tracking
   resources.  This report will further explore the benefits such a system
   can provide for tracking resource use between concurrent threads.
-  
-  % Owned references within the ownerhip monad are then used construct
-  % Owned Channels, an abstraction which sends ownership over an underlying
-  % resource to a thread, in addition to the resource itself.
 }
 
 \acknowledgements{
