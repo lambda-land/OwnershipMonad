@@ -30,7 +30,20 @@
 }
 
 \acknowledgements{
-  TODO
+  To my parents. Thank you for all your help and support.\\
+
+  \noindent
+  To my advisor, Eric Walkingshaw, thank you for all of your thoughtful
+  feedback and patience throughout this process.\\
+
+  \noindent
+  Thank you Jeff Young for reading over my project report and providing useful
+  suggestions.
+
+  % \noindent
+  % To the Rust programming language creators and community, thank you for
+  % creating a language that not only got me excited about using a programming
+  % language but excited about the language itself.
 }
 
 \usepackage{algorithm}
@@ -60,13 +73,13 @@ introduces a set of rules that govern how, when, and by whom a resource within
 what is called an \textit{Owned Reference} (an \texttt{ORef}) can be used.
 
 When an owned reference is created it is bound to a resource.
-The resource is placed within an entry which is then stored in the state of the
-ownership monad.
-At the same time this occurs, the entry becomes the referent to a uniquely
-identifiable variable ID.
+The resource is placed within an entry datatype which is then stored in the
+state of the ownership monad.
+An owned reference is a variable which acts as a uniquely identifiable ID to
+refer to an entry in the ownership monad.
 This variable becomes the way to refer to and access the contents of the
-resource it is bound to inside the ownership monad.
-Each referent can only have, at most, one variable binding at a time.
+entry it is bound to inside the ownership monad.
+Each entry can have, at most, one variable binding at a time.
 
 While the restrictions this implementation imposes may seem to increase the
 complexity of writing programs, the resulting guarantees offer improvements in
@@ -159,20 +172,20 @@ introOChan = startOwn $ do
       up :: String -> Own String
       up x = return (map toUpper x)
 
-  _ <- liftIO $ forkIO $ do
+  _ <- liftIO . forkIO $ do
     _childResult <- startOwn $ do
       ref' <- readOChan ch
-      borrowORef' ref' down
+      borrowAndUpdate ref' down
       writeOChan ch ref'
     return ()
 
-  borrowORef' ref up
+  borrowAndUpdate ref up
   return ()
 \end{lstlisting}
 
 Here a resource is created and placed within an \texttt{ORef}.
 The parent thread proceeds to give up ownership of the \texttt{ORef} when it
-writes it to the owned channel on line 5.
+writes to the owned channel on line 8.
 The child thread can read the \texttt{ORef} from the \texttt{OChan} and claim
 ownership over its contents.
 The child thread can then mutate the resource in a borrow operation before
@@ -182,7 +195,7 @@ Each of the ownership operations used in this example will be defined
 and discussed at greater length later on.
 This example demonstrates a sequence of actions that result in an ownership
 violation.
-This violation is occurs when parent thread tries to use a reference that it
+This violation occurs when a parent thread tries to use a reference that it
 has already given up ownership over by writing the reference to a channel.
 
 When the overall example is evaluated it will result in a \texttt{Left} value
@@ -199,12 +212,13 @@ This is combined with the approach of defining embedded languages in monadic
 programming to allow for dynamic ownership checking without language level
 support for affine types in Haskell.
 
-Concurrent Haskell programs can still fall prey to some of the same fundamental
+Despite its purity,
+concurrent Haskell programs can still fall prey to some of the same fundamental
 problems that other impure languages can, namely deadlock and data races.
 This project report will demonstrate a motivation for adding the kind of
 resource tracking that ownership typing provides by
 looking at what some of these problems look like and how resource tracking acts
-to mitigate these problems.
+to mitigate these problems. % TODO rephrase this sentence?
 This will use the basic concurrency tools available in Haskell
 such as shared state with IORef's and message passing with channels.
 It will then demonstrate and explain the benefits of tracking resource usage
@@ -285,8 +299,8 @@ will not mutate while its resource is being read.
 While a borrow is occurring the internals will exclude other functions or
 operations from mutating the resource.
 
-In Idris to convert a unique type into a borrow type the \texttt{Borrowed}
-dependent data type is used:
+The \texttt{Borrowed} dependent data type is used to convert a unique type into
+a borrowed type:
 
 \begin{verbatim}
 data Borrowed : UniqueType -> BorrowedType where
@@ -359,8 +373,10 @@ let v2 = &v1;
 
 Ampersands are used to create references to the resources owned by other
 variables.
-In the last example the variable \texttt{v2} was instantiated as a borrow
-of the resource owned by \texttt{v1}.
+In the last example the variable \texttt{v2} was instantiated as an immutable
+reference of the resource referred to by variable \texttt{v1}.
+In this case \texttt{v2} is said to be borrowing the value
+that \texttt{v1} owns.
 
 Borrows in Rust come in two flavors. We can either lend a resource to many
 borrowers as long as the borrowers never mutate the underlying resource or we
@@ -433,16 +449,17 @@ drop a reference from the scope, copy them, move the resource from one reference
 to another,  and write a value to a reference.
 Additionally there are operations for borrowing and reading the resource inside
 a reference.
-Borrowing allows a function to temporarily use the resource without taking
-ownership over it. Reading a reference which retrieves a copy of the
-value inside a reference.
+% Borrowing allows a function to temporarily use the resource without taking
+% ownership over it. Reading a reference which retrieves a copy of the
+% value inside a reference.
 
 \subsection{Owned References}
 
 Owned references represent variables which provide both the symbolic entity
 which owns a resources as well as the mechanism to access the underlying resource.
-Resources are bound to a variable when they are created inside the ownership
-monad. In the library implementation these variables are called ORef's or
+Resources are bound to an owned reference variable when they are created inside
+the ownership monad.
+In the library implementation these variables are called ORef's or
 \textit{Owned References}.
 
 The type of an \texttt{ORef} is a thin wrapper around a way to tag and identify
@@ -453,8 +470,8 @@ newtype ORef a = ORef {getID :: ID}
 \end{verbatim}
 
 An \texttt{ORef} is a parameterized abstract data type. Because there is only
-one constructor and one field associated with this datatype it is possible to
-use newtype to eliminate some of the runtime overhead.
+one constructor and one field associated with this datatype
+\texttt{newtype} is used to eliminate some of the runtime overhead.
 
 A phantom type is used to add a type variable to each \texttt{ORef}. This
 ensures the type safety of the code by requiring that a type be embedded
@@ -497,8 +514,8 @@ it resides.
 x <- newORef [1,2,3]
 \end{verbatim}
 
-The \texttt{newORef} function is part of the user facing API of the library
-and. As the example has shown, this function creates a new owned reference
+The \texttt{newORef} function is part of the user facing API of the library.
+As the example has shown, this function creates a new owned reference
 within the ownership monad and places the value provided to the function
 inside the reference. This value is internally stored within an \texttt{IORef}
 in the \texttt{Entry} datatype.
@@ -506,12 +523,12 @@ in the \texttt{Entry} datatype.
 \begin{verbatim}
 newORef :: Typeable a => a -> Own (ORef a)
 newORef a = do
-    (new, store) <- get
+    (newID, store) <- get
     thrId <- liftIO $ myThreadId
     v <- liftIO $ newIORef a
     let entry = (Entry Writable thrId (Just v))
-    put (new + 1, insert new entry store)
-    return (ORef new)
+    put (newID + 1, insert newID entry store)
+    return (ORef newID)
 \end{verbatim}
 
 The current state of the monad is needed in order to produce the next state
@@ -525,9 +542,9 @@ The ID of the thread which created the owned reference must be stored.
 This is done in order to prevent child threads from using the owned
 references that were potentially inherited through the name-spacing scope of
 their parent threads.  The thread ID field of the entry is set when the owned
-reference is initially created. This requires an \texttt{IO} operation to be
-performed in order to get the current thread ID of the thread creating the
-new \texttt{ORef}.
+reference is initially created.
+To get the current thread ID of the thread creating the new \texttt{ORef}
+an \texttt{IO} operation is required.
 
 The entry that will be inserted into the new mapping will have a \texttt{Flag}
 which is set to \texttt{Writable}.
@@ -535,9 +552,6 @@ The new store of entries, as well as the incremented ID, are put back into the
 state.
 The final step is to return the new \texttt{ORef} so that it can be used by other
 ownership operations.
-% Resources that are put into references can only have one owner at any given
-% time. The reference bound to the newly initialized resource becomes the sole
-% owner of that resource. 
 
 \subsection{Dropping an Owned Reference}
 
@@ -622,14 +636,15 @@ within larger abstractions.
 
 A user may want to duplicate a reference in order to have two references
 that at one point were copies of each other.
-This would be trivial to do with regular variables but the ownership rules
-which do not allow more than one binding to a resource complicate the task for
+This would be trivial to do with regular variables but the ownership rules,
+which do not allow more than one binding to a resource, complicate the task for
 owned references.
 
 A simple assignment of a new reference to the old reference would mean that
-the two references were now referring to the same underlying resource. While
-it's possible to make a copy of a variable this way we would not be able to
-make any of the claims of resource use or safety.
+the two references were now referring to the same underlying resource.
+While it's possible to make a copy of a variable this way in Haskell,
+doing so restricts us from making any of the claims about resource use
+or safety.
 
 To create a new owned reference that is a copy of an existing reference
 there is the copy operation. For an owned reference \texttt{x} we can make
@@ -643,7 +658,6 @@ This introduces the new reference \texttt{y} into the monadic context. Initially
 \texttt{y} is a copy of \texttt{x} but since the references are now separate
 entities they are able to diverge in terms of what their internal
 values are following the completion of the copy operation.
-
 
 The copy operation allows the underlying resource owned by a reference to be
 copied by other references if they are within the scope of the same ownership
@@ -662,7 +676,7 @@ startOwn $ do
   y <- copyORef x
   let f :: Int -> Own Int
       f i = return (i+1)
-  borrowORef' x f
+  borrowAndUpdate x f
   xContents <- readORef x
   yContents <- readORef y
   return (xContents, yContents)
@@ -672,8 +686,8 @@ This expression will evaluate to \texttt{Right (2,1)}.
 After the reference \texttt{y} was created by making a copy of
 reference \texttt{x}, the contents of reference \texttt{x}
 was mutated in a borrow operation (borrow operations will be explained in depth
-later in the report.)
-Because of this mutable action the contents inside the copy and the original
+later in the report).
+Due to this mutable action, the contents inside the copy and the original
 reference diverged.
 
 \begin{verbatim}
@@ -751,7 +765,7 @@ new <- moveORef old
 
 A move operation transfers a resource owned by one reference to a new reference.
 An existing reference can also be overwritten by the moved contents of another
-reference using \texttt{moveORef'}.
+reference using \texttt{moveORef' :: Typeable a => ORef a -> ORef a -> Own ()}.
 After a move operation is performed it will no longer be possible to refer to the
 underlying resource through the old reference.
 This operation removes the old reference from the scope of the ownership monad it
@@ -771,15 +785,14 @@ moveORef oldORef = do
         return new
 \end{verbatim}
 
-The implementation of \texttt{moveORef} verifies that the old ORef is writable.
-The old ORef must also exist within the same thread as the ownership monad in
-which the operations are being performed in.
-
-The ownership system needs to enforce that the old ORef is
-writable in order for this operation to occur because this indicates that the
-resource has not been dropped and is still valid to use in this context.
-The ORef must also be writable in order to ensure that another operation
+The implementation of \texttt{moveORef} verifies that the old \texttt{ORef}
+is writable.
+If the \texttt{ORef} is writable this indicates that the reference has not been
+dropped and is still valid to use in this context.
+An \texttt{ORef} which is writable will also ensure that another operation
 is not currently using the resource in a mutable way.
+The old \texttt{ORef} must exist within the same thread as the ownership monad
+in which the operations are being performed in.
 
 If the old ORef is valid and can be used in the operation, a copy of it is made
 with the \texttt{copyORef} function.
@@ -809,7 +822,7 @@ startOwn $ do
 \end{lstlisting}
 
 This expression does not violate the ownership rules and will evaluate
-to \texttt{Right ``greeting''}.
+to \texttt{Right "greeting"}.
 If, for example, an expression tried to use a moved resource through an
 old reference binding, the expression will evaluate to a \texttt{Left} value
 such as for the following code:
@@ -824,7 +837,7 @@ startOwn $ do
 \end{lstlisting}
 
 This expression violates the ownership system rules and will evaluate to
-a \texttt{Left} because the first \texttt{readORef} operation used is
+a \texttt{Left} value because the first \texttt{readORef} operation is
 attempting to read the resource in \texttt{x} that has been moved to \texttt{y}.
 
 
@@ -838,7 +851,7 @@ it previous contents.
 For example in the following expression the contents of \texttt{ref}
 will be destructively updated with the new contents. This expression does
 not violate any ownership rules and will evaluate
-to \texttt{Right ``Some new contents''}. 
+to \texttt{Right "Some new contents"}. 
 
 \begin{lstlisting}
 startOwn $ do
@@ -908,8 +921,8 @@ reference.
 startOwn $ do
   x <- newORef "Hello from inside the reference"
   let f :: String -> Own ()
-      f a = liftIO $ 
-             putStrLn $ "The contents of the ORef is: " ++ a
+      f a = liftIO . putStrLn $
+              "The contents of the ORef is: " ++ a
   _ <- borrowORef x f
   return ()
 \end{lstlisting}
@@ -942,7 +955,7 @@ a long running function borrows the resource inside a reference.
 
 The borrow operation is similar to passing a value to a function as a mutable
 borrow in the Rust language.
-As we saw with the example this library takes a slightly different approach:
+As we saw in the previous example this library takes a slightly different approach:
 instead of letting variables borrow a resource, a borrow operation instead lends
 the resource to a function which temporarily borrows the resource in order to
 use it and potentially mutate it in place.
@@ -1006,10 +1019,10 @@ value (Entry _ _ Nothing) = return Nothing
 
 The function that borrows the resource is of type \texttt{(a -> Own b)}. The
 resource being consumed in the function remains inside of the context of the
-ownership monad while the function executes. % TODO explain why this matters
+ownership monad while the function executes.
+Much like the Rust language, the borrow operation on an \texttt{ORef} will not
+permit a (potentially mutable) resource to be lent to multiple borrowers.
 
-Much like the Rust language will not allow for a mutable resource to be lent to
-multiple borrowers - neither will the borrow operation on an \texttt{ORef}.
 This will ensure that the resource is not mutated or written to while is it lent
 out to the borrowing function.
 Because each borrow operation occurs within the context of the ownership monad
@@ -1020,9 +1033,9 @@ executes.
 The borrow operation also ensures that the original \texttt{ORef} does not
 go away before the function borrowing it is complete. This will make sure that
 the function is not referring to an \texttt{ORef} that no longer exists.
-The \texttt{ORef} that is being borrowed by the function is not able to be moved
-(or otherwise dropped) before the function that the resource has been lent to is
-complete. This is enforced by the move and drop operations which individually
+The borrowed \texttt{ORef} is not able to be moved or dropped before the
+borrowing function completes.
+This is enforced by the move and drop operations which individually
 check that a \texttt{ORef} does not have any functions borrowing the resource.
 
 This library does not allow multiple functions to simultaneously perform
@@ -1036,7 +1049,7 @@ The type signature ensures that the function borrowing the reference will
 have the same resulting type as the reference:
 
 \begin{verbatim}
-borrowORef' :: Typeable a => ORef a -> (a -> Own a) -> Own ()
+borrowAndUpdate :: Typeable a => ORef a -> (a -> Own a) -> Own ()
 \end{verbatim}
 
 
@@ -1261,7 +1274,7 @@ resource (if it possesses it) it must gain access to the inner resource.
 In a multi-threaded program, one thread may gain access to one resource,
 while at the same time another thread gains access to the other resource.
 In such a situation both threads now need what the other thread has in order to
-release their resource they already hold.
+release the resource they hold.
 
 This kind of bug is difficult to find and debug because it cannot be dependably
 reproduced.  The reason for this is that the situation described in this
@@ -1280,9 +1293,9 @@ ownership violation they introduced into their multi-threaded program:
 \begin{lstlisting}
 nestedORef :: ORef Int -> ORef Int -> Own ()
 nestedORef outerRef innerRef = do
-  borrowORef' outerRef $ \outer -> do
+  borrowAndUpdate outerRef $ \outer -> do
     liftIO $ yield
-    borrowORef' innerRef $ 
+    borrowAndUpdate innerRef $ 
                   \inner -> return (inner + 1)
     return (outer + 1)
   return ()
@@ -1341,7 +1354,7 @@ over the resource it consumes from the channel.
 
 Once a thread has sent a resource over the channel,
 later operations in the thread will be prevented from using that resource.
-If the thread needed to use the resource again, it would have to read the
+If a thread needs to use the resource again, it must read the
 resource from a channel and reclaim ownership over the resource.
 
 \subsection{Motivation}
@@ -1390,7 +1403,7 @@ in Haskell provide.
 
 The major idea that owned channels take advantage of is that ownership
 of resources can be tracked and used in isolation. Each ownership monad only
-needs to concern itself with the references that are in the scope of that monad.
+needs to concern itself with references that are in the scope of that monad.
 
 For that reason multiple threads can exist and each can have their own
 ownership monad without sacrificing the ability to reason about resource use.

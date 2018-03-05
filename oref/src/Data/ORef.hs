@@ -21,7 +21,7 @@ module Data.ORef
   , moveORef'
   , writeORef
   , borrowORef
-  , borrowORef'
+  , borrowAndUpdate
   , readORef
   ) where
 
@@ -40,12 +40,12 @@ import Control.Concurrent (myThreadId)
 -- | Create a new ORef.
 newORef :: Typeable a => a -> Own (ORef a)
 newORef a = do
-    (new, store) <- get
+    (newID, store) <- get
     thrId <- liftIO $ myThreadId
     v <- liftIO $ newIORef a
     let entry = (Entry Writable thrId (Just v))
-    put (new + 1, insert new entry store)
-    return (ORef new)
+    put (newID + 1, insert newID entry store)
+    return (ORef newID)
 
 -- | Remove an ORef from the current context.
 --
@@ -190,8 +190,8 @@ borrowORef oref k = do
 --
 -- This allows one function to have the ability to operate on the value
 -- inside an ORef and mutate it.
-borrowORef' :: Typeable a => ORef a -> (a -> Own a) -> Own ()
-borrowORef' oref k = do
+borrowAndUpdate :: Typeable a => ORef a -> (a -> Own a) -> Own ()
+borrowAndUpdate oref k = do
     ok <- checkORef oref -- check if the ORef can be read and written to
     case ok of
       False -> lift $

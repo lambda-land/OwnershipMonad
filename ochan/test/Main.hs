@@ -45,14 +45,14 @@ introOChan = startOwn $ do
       up :: String -> Own String
       up x = return (map toUpper x)
 
-  _ <- liftIO $ forkIO $ do
+  _ <- liftIO . forkIO $ do
     _childResult <- startOwn $ do
       ref' <- readOChan ch
-      borrowORef' ref' down
+      borrowAndUpdate ref' down
       writeOChan ch ref'
     return ()
 
-  borrowORef' ref up
+  borrowAndUpdate ref up
   return ()
 
 

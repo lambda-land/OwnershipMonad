@@ -59,7 +59,7 @@ divergingCopy = startOwn $ do
   y <- copyORef x
   let f :: Int -> Own Int
       f i = return (i+1)
-  borrowORef' x f
+  borrowAndUpdate x f
   xContents <- readORef x
   yContents <- readORef y
   return (xContents, yContents)
@@ -174,7 +174,7 @@ evalBorrowORefExample1 = startOwn borrowORefExample1
 borrowExamplePaper1 = startOwn $ do
   x <- newORef "Hello from inside the reference"
   let f :: String -> Own ()
-      f a = liftIO $ putStrLn $ "The contents of the ORef is: " ++ a
+      f a = liftIO . putStrLn $ "The contents of the ORef is: " ++ a
   _ <- borrowORef x f
   return ()
 
@@ -183,7 +183,7 @@ borrowExamplePaper1 = startOwn $ do
 borrowExamplePaper2 = startOwn $ do
   x <- newORef "Hello from inside the reference"
   let f :: String -> Own ()
-      f a = liftIO $ putStrLn $ "The contents of the ORef is: " ++ a
+      f a = liftIO . putStrLn $ "The contents of the ORef is: " ++ a
   _ <- borrowORef x f
   contents <- readORef x
   return contents
@@ -347,9 +347,9 @@ deadlockMVar = do
 -- And with ORef's
 nestedORef :: ORef Int -> ORef Int -> Own ()
 nestedORef outerRef innerRef = do
-  borrowORef' outerRef $ \outer -> do
+  borrowAndUpdate outerRef $ \outer -> do
     liftIO $ yield
-    borrowORef' innerRef $
+    borrowAndUpdate innerRef $
                   \inner -> return (inner + 1)
     return (outer + 1)
   return ()
