@@ -618,8 +618,8 @@ checkORef oref  = do
     return $ (threadId == thrId) && writable entry
 \end{verbatim}
 
-If the ownership system rules are not being violated then the ORef will be
-dropped by having it's flag set to \texttt{Locked} and the value in the
+If the ownership system rules are not being violated then the \texttt{ORef}
+will be dropped by having it's flag set to \texttt{Locked} and the value in the
 entry set to \texttt{Nothing}.
 The entry is not deleted from the internal mapping of
 ID's to entries. Doing so allows the ownership system to determine if an ORef
@@ -722,7 +722,7 @@ inThreadAndReadable oref = do
 
 An owned reference which is set to readable signals that there may be other
 operations using the resource but in a way that is immutable.
-If an ORef is writable this indicates that no function is currently using the
+If an \texttt{ORef}is writable this indicates that no function is currently using the
 resource in a way that may mutate the value.
 
 If the copy operation is able to occur the new owned reference is inserted into
@@ -794,16 +794,16 @@ is not currently using the resource in a mutable way.
 The old \texttt{ORef} must exist within the same thread as the ownership monad
 in which the operations are being performed in.
 
-If the old ORef is valid and can be used in the operation, a copy of it is made
+If the old \texttt{ORef} is valid and can be used in the operation, a copy of it is made
 with the \texttt{copyORef} function.
-After the copy is complete during the move operation, the old ORef is dropped
-using the \texttt{dropORef} function.
-This removes the old ORef from that monad and prevents other operations from
-referring to the resource through the old ORef.
-The old ORef and its entry have been dropped and internally within the state of
-the monad are set to \texttt{Nothing}.
-The resource space inside the entry corresponding to the old ORef can be safely
-freed.
+After the copy is complete during the move operation, the old \texttt{ORef} is
+dropped using the \texttt{dropORef} function.
+This removes the old \texttt{ORef} from that monad and prevents other operations
+from referring to the resource through the old \texttt{ORef}.
+The old \texttt{ORef} and its entry have been dropped and internally within the
+state of the monad are set to \texttt{Nothing}.
+The resource space inside the entry corresponding to the old \texttt{ORef} can
+be safely freed.
 
 There is a key difference between moving a resource from an existing reference
 and copying it to a new one.  Functionally a resource that is copied is cloned
