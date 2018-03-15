@@ -6,7 +6,7 @@ maintainer: mcgirrm@oregonstate.edu
 license: BSD3
 github: lambda-land/OwnershipMonad
 extra-source-files:
-  - README.md
+  - README.org
 
 default-extensions:
   - ExistentialQuantification

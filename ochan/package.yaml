@@ -9,7 +9,7 @@ copyright: 2017 Mike McGirr
 license: BSD3
 github: lambda-land/OwnershipMonad
 extra-source-files:
-  - README.md
+  - README.org
 
 dependencies:
   - base >=4.8 && <5
