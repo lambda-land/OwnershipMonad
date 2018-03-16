@@ -64,17 +64,6 @@ divergingCopy = startOwn $ do
   yContents <- readORef y
   return (xContents, yContents)
 
-letTest :: Own ()
-letTest = do
-  ref <- newORef "hello"
-  let test = ref
-  _testCopy <- copyORef test
-  _copy <- copyORef ref
-  return ()
-
-evalLetTest :: IO (Either String ())
-evalLetTest = startOwn letTest
-
 -- | moveORef success test
 -- A simple test for the move operation that should pass.
 moveORefExample1 :: Own ()
@@ -218,8 +207,14 @@ evalBorrowORefExample2 = startOwn borrowORefExample2
 
 
 -- | borrowORef test
+--
 -- A test to show that a partially applied writeORef passed as the function
--- to a readORef will not be able to mutate the original ORef.
+-- to a borrowORef operation will not be able to mutate the original ORef.
+--
+-- This will fail because the writeORef operation will not be able to
+-- write to the ORef while that ORef is being borrowed. The write operation
+-- (inside the function passed to the borrow) refers the ORef name
+-- declared outside of the borrow operation.
 borrowORefExample3 :: Own ()
 borrowORefExample3 = do
   ref <- newORef "Original value of the ref"
@@ -231,18 +226,6 @@ borrowORefExample3 = do
 -- This should evaluate to Left String
 evalBorrowORefExample3 :: IO (Either String ())
 evalBorrowORefExample3 = startOwn borrowORefExample3
-
--- TODO
--- | borrowORef test of multiple immutable borrows
--- This is an example of multiple functions performing immutable operations on
--- a single ORef
-
--- TODO
--- | borrowORef test for flag status.
--- Test for borrowORef to show that during the read operation is the ORef is
--- marked as having borrowers (both flags are False)
--- and that after the borrow operation is complete the ORef is marked as not
--- having any borrowers (both flags are True.)
 
 
 
@@ -383,11 +366,6 @@ main = do
   case test3 of
     Right () -> putStrLn "Test 3 passed"
     _ -> putStrLn " -- Test 3 failed -- "
-
-  let_test <- evalLetTest
-  case let_test of
-    Right _ -> putStrLn " -- Let Test failed -- "
-    _ -> putStrLn "Let Test passed"
 
   test4 <- evalMoveORefExample1
   case test4 of
