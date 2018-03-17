@@ -343,7 +343,7 @@ deadlockORef = do
   orefB <- newORef 0
   forkOwn $ nestedORef orefA orefB
   liftIO $ threadDelay 1000000 -- Wait a second just so that the output is printed nicely
-  forkOwn $ nestedORef orefB orefB
+  forkOwn $ nestedORef orefB orefA
   return ()
 
 
