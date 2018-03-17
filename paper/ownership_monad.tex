@@ -1305,7 +1305,7 @@ deadlockORef = do
   orefA <- newORef 0
   orefB <- newORef 0
   forkOwn $ nestedORef orefA orefB
-  forkOwn $ nestedORef orefB orefB
+  forkOwn $ nestedORef orefB orefA
   return ()
 \end{lstlisting}
 
