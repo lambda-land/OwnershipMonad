@@ -141,7 +141,6 @@ checkORef oref  = do
   liftIO $ do
     threadId <- myThreadId
     return $ (threadId == thrId) && writable entry
-    -- TODO should this also include if the ORef Entry is an empty Nothing value?
 
 -- | The value inside the IORef of an entry casted to the expected type.
 --
@@ -216,10 +215,6 @@ getValue oref = do
   case v of
     Just a -> return a
     Nothing -> lift $ left "Cannot retrieve the value of an empty ORef"
--- TODO is it practical to return the failure left case of the Own monad in this
--- function?
--- Should Nothing be returned when the value is Nothing/empty?
--- Does it make sense to get the value of an empty ORef?
 
 -- | Set the current value of an ORef.
 --
