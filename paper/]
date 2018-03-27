@@ -418,12 +418,12 @@ safer way to introduce mutability, when it is needed, into a Haskell program.
 
 \section{Internal Implementation}
 
-Apart from the ownership monad type \texttt{Own} and the functions to evaluate
-the ownership monad, the data structures and functions used in the
-implementation of the internal module would be invisible to the user of the
-library.
-The operations which will be discussed in the section following the internals
-section make up the public facing API that is available to the library user.
+Apart from ownership monad type \texttt{Own}, the data structures and functions
+used in the implementation of the internal module would be invisible to the
+user of the library.
+The operations which will be discussed in the seciton following the internals
+of the ownership monad make up the public facing API that is available to the
+user.
 
 The first major piece of the internals is the ownership monad.
 The type of the ownership monad internally is:
@@ -1467,7 +1467,8 @@ channel, within the owned channel operation, the function writing the resource
 to the channel needs to borrow the resource.
 This might seem odd since it would appear that the function borrowing access
 to the resource intends to send the resource to another thread.
-The resource that was written to the channel will not be returned.
+This is accurate, the resource that was written to the channel will not be
+returned and under the rules for a borrow this kind of use is allowed.
 This is similar to a resource being duplicated using the copy operation, the
 only difference is that the function which is borrowing access 
 performs an \texttt{IO} operation to send a copy of the resource to the
@@ -1618,6 +1619,7 @@ with the write and read operation for owned channels,
 provides the same ability to reason about resource use and detect violations.
 
 
+
 \chapter{Conclusion}
 
 This project report has demonstrated a monadic library-based approach for
@@ -1638,35 +1640,14 @@ While systems based on these approaches may provide more features for resource
 tracking, the resource tracking functionality defined in the ownership
 monad leverages existing language features and libraries in Haskell.
 
-\subsection{Ownership Typing in Other Domains}
-
 This report has also shown that the operations presented with the ownership
 monad can be used to construct larger abstractions which concern themselves with
 resource use. The owned reference operations in this library were designed to
-create a system to explore ownership typing rules in Haskell.  Shared mutable
-state in concurrent programs using owned channels was early area where the
-usefulness of this system was discovered.
-
-Owned channels are comprised of owned reference operations which enforce the
-ownership typing rules.
-In this design owned reference operations are decoupled from the owned channel
-operations and are instead used internally as building blocks for the owned
-channel operations. 
-
-It may also be possible to create other abstractions out of the operations
-for owned references which target domains outside of concurrency.
-This library in its current form is primarily concerned with resource use
-between threads.
-For that reason thread ID is deeply routed in the ownership typing rules this
-library implements for owned references.
-
-Future forms could disentangle thread ID from this central internal role
-and make it a type level component of the DSL for owned references.
-Doing so would allow for the operations on owned references to be polymorphic
-over the possible types of identifying values for resource spaces in other
-project domains. For concurrency between threads this would continue to be
-thread ID, but for other areas such as distributed computing between separate
-machines or for operating system processes, other types could be used.
+create a system to explore ownership typing rules in Haskell.  Shared mutaable
+state in concurrent programs was early area where the usefulness of this system
+was made aparent.
+While it may be possible to create other abstractions out of these operations
+for domains outside of the concurreny this library i
 
 
 \bibliographystyle{plain}
