@@ -9,7 +9,7 @@
 \major{Computer Science}
 \advisor{Eric Walkingshaw}
 \submitdate{2018 March 19}
-\commencementyear{2018} % TODO the month of June is hardcoded in for this
+\commencementyear{2018}
 
 \abstract{
   The Rust programming language is a systems programming language with a
@@ -85,7 +85,6 @@ approaches can offer abilities to reason about resource usage.
 Adding a way to keep track of resources in a pure language like Haskell may
 at the onset seem unnecessary since in a pure language, by definition,
 the data making up the resources bound to variables is immutable.
-% TODO Add citation
 Because of this there is no inherent state.  Haskell's purity therefore allows
 for referential transparency where values and variables in closed expressions
 can be thought of as being interchangeable.
@@ -132,7 +131,6 @@ This new thread will run concurrently with the original parent thread.
 
 This creates a clear race condition between the two threads and the mutable
 contents of the \texttt{IORef} shared between them.
-% TODO explain what an IORef is?
 Both threads have access to the same \texttt{IORef} and it could be unclear
 which will access the resource first.  Under these conditions the issue is not
 only that we have shared mutable state but that we have shared access to that
@@ -213,12 +211,11 @@ problems that other impure languages can, namely deadlock and data races.
 This project report will demonstrate a motivation for adding the kind of
 resource tracking that ownership typing provides by
 looking at what some of these problems look like and how resource tracking acts
-to mitigate these problems. % TODO rephrase this sentence?
+to mitigate these problems.
 This will use the basic concurrency tools available in Haskell
 such as shared state with IORef's and message passing with channels.
 It will then demonstrate and explain the benefits of tracking resource usage
 with a set of rules similar to affine types.
-% TODO mention how it makes it easier to debug and detect these problems
 
 \chapter{Background}
 
@@ -1394,7 +1391,6 @@ The resources available to each of these threads are covered by that thread's
 ownership monad.
 The act of giving up ownership (on write operations) is enough information to
 facilitate the transfer of resource ownership between threads.
-% TODO add example to back this up
 
 Owned channels are the abstraction built on top of the ownership monad which
 handle the inter-thread ownership information. The operations are intended
@@ -1641,10 +1637,17 @@ monad leverages existing language features and libraries in Haskell.
 
 \subsection{Structured Error Reporting} \label{error}
 
-% TODO add a small section on replacing EitherT with better more structured
-% error reporting.
-% This structured error type would list out the operation the error occurred in
-% and what the cause was.
+In the current implementation of the ownership monad, violations are reported
+using the existing \texttt{Either} monad transformer. Future work could instead
+use a structured error type in place of \texttt{Either}. 
+This approach would define a sum type encompassing the possible errors and
+ownership typing violations.
+As a Haskell data type, the representations of the failure cases could have
+constructor fields which would indicate what ownership operation the error
+occurred in and why.
+Using custom types in the constructor fields to represent this information
+would allow library users to pattern match on those failure conditions.
+
 
 \subsection{Ownership Typing in Other Domains}
 
@@ -1672,7 +1675,6 @@ Future forms could disentangle thread ID from this central internal role
 in owned references in the \texttt{Entry} datatype and replace it with
 a type parameter or a type variable.
 
-% TODO check this
 \begin{verbatim}
 data Entry =
   forall x v. Typeable v => Entry Flag x (Maybe (IORef v))
