@@ -247,11 +247,11 @@ type systems.
 Idris, a dependently typed language, treats uniqueness types as a subkind of
 regular types. Uniqueness types in Idris are also inspired by ownership types
 and borrowed pointers in the Rust programming language, as well as Uniqueness
-Types in the Clean programming language. % TODO add citation.
+Types in the Clean programming language.
 
 In Idris a value that has a type that is made up of a \texttt{UniqueType}
-will only be able to have at most one reference to it at run-time.
-% TODO add citation.
+will only be able to have at most one reference to it at run-time
+\cite{idris_uniqueness_types}.
 In order to make this guarantee, any value of a unique type is kept separate
 from normally typed values - which have the type \texttt{Type}.
 
@@ -289,7 +289,7 @@ While a borrow is occurring the internals will exclude other functions or
 operations from mutating the resource.
 
 The \texttt{Borrowed} dependent data type is used to convert a unique type into
-a borrowed type:
+a borrowed type \cite{idris_uniqueness_types} :
 
 \begin{verbatim}
 data Borrowed : UniqueType -> BorrowedType where
@@ -299,7 +299,6 @@ implicit
 lend : {a : UniqueType} -> a -> Borrowed a
 lend x = Read x
 \end{verbatim}
-% TODO cite the Idris docs
 
 The \texttt{lend} function can then be invoked to create a \texttt{BorrowedType}.
 Doing so will indicate that while the underlying \texttt{UniqueType} variable is
@@ -315,12 +314,11 @@ safety claims of using such a system have been formally proved and
 machine-checked in Coq \cite{Jung:2017:RSF:3177123.3158154}.
 
 The Rust language has inherent state, and additionally all variables must obey
-the ownership rules.
-% TODO cite the Rust book ownership rules.
+the ownership rules \cite{rust_book_ownership}.
 These rules are checked at compile time and are enforced over all variables in
 a program.
-Doing so allows Rust to forgo a runtime system or a garbage collector.
-% TODO add citation for this
+Doing so allows Rust to forgo a runtime system \cite{rust_runtime_faq}
+or a garbage collector \cite{rust_gc_faq}.
 
 In Rust, memory allocation is handled through the ownership system.
 The ownership system is a language-level abstraction which makes use of
