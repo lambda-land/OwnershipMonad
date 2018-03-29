@@ -39,11 +39,6 @@
   \noindent
   Thank you Jeff Young for reading over my project report and providing useful
   suggestions.
-
-  % \noindent
-  % To the Rust programming language creators and community, thank you for
-  % creating a language that not only got me excited about using a programming
-  % language but excited about the language itself.
 }
 
 \usepackage{algorithm}
@@ -235,11 +230,11 @@ result from mutable state \cite{Wadler90lineartypes} and concurrency
 \cite{caires2010session}.
 
 Language level support for linear types has been proposed for the Glasgow
-Haskell Compiler\cite{LinearTypesGHC}.
+Haskell Compiler \cite{LinearTypesGHC}.
 % This would add plain linear types, directly inspired from linear logic.
 Ways to add linear types to Haskell without language level support have also
 been demonstrated using embedded domain specific languages within a monadic
-context\cite{Paykin:2017:LM:3122955.3122965}. 
+context \cite{Paykin:2017:LM:3122955.3122965}. 
 
 Other less restrictive forms of logic have been used in type systems for similar
 resource tracking.
@@ -376,7 +371,7 @@ that \texttt{v1} owns.
 Borrows in Rust come in two flavors. We can either lend a resource to many
 borrowers as long as the borrowers never mutate the underlying resource, or we
 can lend it to a single borrower that will be able to mutate the
-resource\cite{rust_book_borrowing}.
+resource \cite{rust_book_borrowing}.
 It should be clear why giving multiple variables mutable access to
 the same resource could create data races which is why mutable borrows to
 multiple variables (or functions) are not allowed.
@@ -384,7 +379,7 @@ multiple variables (or functions) are not allowed.
 A function in Rust depending on the type signature will either copy the value
 it is passed, take ownership of the value, or it will borrow the value --- in
 which case ownership of the value is automatically returned when the function
-has finished execution\cite{rust_book_ownership}.
+has finished execution \cite{rust_book_ownership}.
 A function in Rust that takes a borrowed value as an argument is
 syntactic sugar over that function first taking ownership of the value and then
 returning ownership over the value by placing it within the expression that is
@@ -437,7 +432,9 @@ Expressions written in the ownership monad will evaluate to a
 The string \texttt{s} value produced gives an error message reporting the
 details of the ownership violation.
 Likewise, an ownership monad with no violations will evaluate to a
-\texttt{Right a} value which gives the outcome returned from the ownership monad.
+\texttt{Right} value which gives the outcome returned from the ownership monad.
+Future work on error reporting, including structured error types for ownership
+violations, will be discussed in section \ref{error}.
 
 State is represented using the \texttt{StateT} monad transformer.
 The ownership monad needs to track the state of ownership system operations that
@@ -502,7 +499,7 @@ the runtime memory storing the prior value in an entry can be freed.
 
 Internally the value stored in a non-empty entry is placed in an \texttt{IORef}.
 An \texttt{IORef} in Haskell is a mutable reference in the IO monad - an IO
-reference. %TODO change this sentence
+reference.
 The ownership monad uses entries to store the values assigned to owned
 references.
 Even though the values in entries are mutable because of the internal
@@ -815,12 +812,12 @@ distinction between making a copy of resources that are fixed in
 size\footnote{Rust will also consider an assignment operation to be a copy
   instead of a move if the \textbf{Copy} trait or the \textbf{Clone} trait is
   implemented for that type of
-  resource\cite{rust_docs_clone_trait, rust_book_traits}. 
+  resource \cite{rust_docs_clone_trait, rust_book_traits}. 
   }
 and making a copy of resources which are more complex and not fixed in size.
 For the latter case it is still possible to copy these kinds of resources, but
 these need to be cloned (using the clone function) because otherwise Rust will
-consider these values to have been moved\cite{rust_book_ownership}.
+consider these values to have been moved \cite{rust_book_ownership}.
 With this library there is only one version of a copy, and it creates a new
 resource identical to the original; there is no distinction given to the kinds
 of resources that are being copied.
@@ -1030,10 +1027,10 @@ a long-running function borrows the resource inside a reference.
 
 The borrow operation is similar to passing a value to a function as a mutable
 borrow in the Rust language.
-As we saw in the previous example this library takes a slightly different approach:
-instead of letting variables borrow a resource, a borrow operation instead lends
-the resource to a function which temporarily borrows the resource in order to
-use it and potentially mutate it in place.
+As we saw in the previous example this library takes a slightly different
+approach: instead of letting variables borrow a resource, a borrow operation
+instead lends the resource to a function which temporarily borrows the resource
+in order to use it and potentially mutate it in place.
 
 \begin{verbatim}
 borrowORef :: Typeable a => ORef a -> (a -> Own b) -> Own b
@@ -1620,6 +1617,8 @@ provides the same ability to reason about resource use and detect violations.
 
 \chapter{Conclusion}
 
+\section{Resource management in the Ownership Monad}
+
 This project report has demonstrated a monadic library-based approach for
 tracking resources.
 Resource management done in this way allows a user to detect when a program
@@ -1638,35 +1637,54 @@ While systems based on these approaches may provide more features for resource
 tracking, the resource tracking functionality defined in the ownership
 monad leverages existing language features and libraries in Haskell.
 
+\section{Future Work} \label{future}
+
+\subsection{Structured Error Reporting} \label{error}
+
+% TODO add a small section on replacing EitherT with better more structured
+% error reporting.
+% This structured error type would list out the operation the error occurred in
+% and what the cause was.
+
 \subsection{Ownership Typing in Other Domains}
 
 This report has also shown that the operations presented with the ownership
 monad can be used to construct larger abstractions which concern themselves with
 resource use. The owned reference operations in this library were designed to
 create a system to explore ownership typing rules in Haskell.  Shared mutable
-state in concurrent programs using owned channels was early area where the
+state in concurrent programs using owned channels was an early area where the
 usefulness of this system was discovered.
 
 Owned channels are comprised of owned reference operations which enforce the
 ownership typing rules.
-In this design owned reference operations are decoupled from the owned channel
-operations and are instead used internally as building blocks for the owned
-channel operations. 
+In this design, owned reference operations are superficially decoupled from the
+owned channel operations and are instead used internally as building blocks for
+the owned channel operations.
 
-It may also be possible to create other abstractions out of the operations
-for owned references which target domains outside of concurrency.
-This library in its current form is primarily concerned with resource use
+This library, in its current form, is primarily concerned with resource use
 between threads.
 For that reason thread ID is deeply routed in the ownership typing rules this
-library implements for owned references.
+library implements for owned references. 
+It may be possible to create other abstractions out of the operations for owned
+references which target domains outside of concurrency.
 
 Future forms could disentangle thread ID from this central internal role
-and make it a type level component of the DSL for owned references.
-Doing so would allow for the operations on owned references to be polymorphic
-over the possible types of identifying values for resource spaces in other
-project domains. For concurrency between threads this would continue to be
-thread ID, but for other areas such as distributed computing between separate
-machines or for operating system processes, other types could be used.
+in owned references in the \texttt{Entry} datatype and replace it with
+a type parameter or a type variable.
+
+% TODO check this
+\begin{verbatim}
+data Entry =
+  forall x v. Typeable v => Entry Flag x (Maybe (IORef v))
+\end{verbatim}
+
+The possible types of identifying values for resource spaces in other project
+domains could then be used in this type variable.
+For concurrency between threads this type would continue to be the thread ID,
+but for other areas such as distributed computing between separate machines or
+for operating system processes, other types could be used.
+Doing so would then allow for the operations on owned references to be
+polymorphic over those types.
 
 
 \bibliographystyle{plain}
