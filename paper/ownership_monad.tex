@@ -213,7 +213,7 @@ resource tracking that ownership typing provides by
 looking at what some of these problems look like and how resource tracking acts
 to mitigate these problems.
 This will use the basic concurrency tools available in Haskell
-such as shared state with IORef's and message passing with channels.
+such as shared state with \texttt{IORef}'s and message passing with channels.
 It will then demonstrate and explain the benefits of tracking resource usage
 with a set of rules similar to affine types.
 
@@ -424,7 +424,7 @@ type Own a = StateT (ID,Store) (EitherT String IO) a
 
 Expressions written in the ownership monad will evaluate to a
 \texttt{Left String} value when violations of the ownership rules are detected.
-The string \texttt{s} value produced gives an error message reporting the
+The string value produced gives an error message reporting the
 details of the ownership violation.
 Likewise, an ownership monad with no violations will evaluate to a
 \texttt{Right} value which gives the outcome returned from the ownership monad.
@@ -453,7 +453,7 @@ constraint on the type variable \texttt{v}.
 The combination of these allows for the references in the state to be
 heterogeneous.
 Otherwise it would be necessary to limit the \texttt{Store} to owned
-references of only one type per monadic state. % Right?
+references of only one type per monadic state.
 Using the \texttt{Typeable} typeclass does require that values in each entry are
 \texttt{cast} in a type-cast operation.  However this is handled internally
 by the library when values are retrieved from an entry.
@@ -1222,7 +1222,7 @@ unfettered access to the same shared resource, without careful consideration
 a mutex can easily create a deadlock situation.
 
 Deadlock situations are common when shared resources, protected through
-mutual exclusion, are nested.  MVar's (mutable variables) in Haskell can be
+mutual exclusion, are nested.  \texttt{MVar}'s (mutable variables) in Haskell can be
 used to demonstrate such a situation:\footnote{ This example of lock order
   inversion deadlock adapted from the example of deadlock from Chapter 24 of
   Real World Haskell \cite{O'Sullivan:2008:RWH:1523280} }
@@ -1636,8 +1636,11 @@ monad leverages existing language features and libraries in Haskell.
 \subsection{Structured Error Reporting} \label{error}
 
 In the current implementation of the ownership monad, violations are reported
-using the existing \texttt{Either} monad transformer. Future work could instead
-use a structured error type in place of \texttt{Either}. 
+using the existing \texttt{Either} monad transformer. This propagates a
+\texttt{Left String} value which contains the error message when an ownership
+typing violation occurs.
+Future work could instead use a structured error type in place of the string.
+
 This approach would define a sum type encompassing the possible errors and
 ownership typing violations.
 As a Haskell data type, the representations of the failure cases could have
@@ -1645,7 +1648,6 @@ constructor fields which would indicate what ownership operation the error
 occurred in and why.
 Using custom types in the constructor fields to represent this information
 would allow library users to pattern match on those failure conditions.
-
 
 \subsection{Ownership Typing in Other Domains}
 
