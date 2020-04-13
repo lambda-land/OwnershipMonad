@@ -5,4 +5,4 @@
 *.swp
 TAGS
 .stack-work/
-ochan.cabal
+stack.yaml.lock

@@ -1,3 +1,0 @@
-** ORef
-*** Introduction
-The Ownership Monad
