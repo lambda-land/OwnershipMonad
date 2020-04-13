@@ -1,3 +1,3 @@
-** OChan
-*** Intro
+# OChan
+
 Channels in the Ownership Monad.
