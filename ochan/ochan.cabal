@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f5370b3ec209d8f1ae55fc60977c67521178ad0459ef54f0d8e6372c77d2deaf
+-- hash: 517a933855fd57fbd0985a94fb807ee9723640e29036e50d295a617945a1a669
 
 name:           ochan
-version:        0.1.0.0
+version:        0.1.0
 synopsis:       Owned channels in the Ownership Monad
 description:    Resource tracking channels that use the rules enforced in the Ownership Monad.
 category:       Concurrency
@@ -20,7 +20,8 @@ license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
-    README.org
+    README.md
+    CHANGELOG.md
 
 source-repository head
   type: git
@@ -35,7 +36,7 @@ library
     , base >=4.8 && <5
     , bytestring
     , mtl ==2.2.1
-    , oref
+    , oref >=0.0.3
     , text
     , transformers
   exposed-modules:
@@ -56,7 +57,7 @@ test-suite test
     , base >=4.8 && <5
     , bytestring
     , mtl ==2.2.1
-    , oref
+    , oref >=0.0.3
     , text
     , transformers
   other-modules:

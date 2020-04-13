@@ -37,11 +37,12 @@ resolver: lts-8.23
 # will not be run. This is useful for tweaking upstream packages.
 packages:
 - .
-- ../oref
+# - ../oref
+# For development
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps: []
+extra-deps: [ oref-0.0.3 ]
 
 # Override default flag values for local packages and extra-deps
 flags: {}
@@ -67,6 +68,6 @@ extra-package-dbs: []
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
 
-# nix:
-#   enable: true
-#   shell-file: shell.nix
+nix:
+  enable: true
+  shell-file: shell.nix
