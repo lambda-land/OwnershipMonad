@@ -1,12 +1,16 @@
 name: oref
 version: '0.0.3'
+synopsis: Owned references in the Ownership Monad
+description: A monad which implements aspects of the Rust langauge's ownership system as a library in Haskell.
 category: Data
 author: Mike McGirr
-maintainer: mcgirrm@oregonstate.edu
+maintainer: mike@oatsmail.com
+copyright: 2017 Mike McGirr
 license: BSD3
 github: lambda-land/OwnershipMonad
 extra-source-files:
-  - README.org
+  - README.md
+  - CHANGELOG.md
 
 default-extensions:
   - ExistentialQuantification

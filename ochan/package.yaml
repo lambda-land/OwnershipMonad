@@ -1,10 +1,10 @@
 name: ochan
 version: '0.1.0.0'
-synopsis: Owned channels
-description: Resource tracking channels
+synopsis: Owned channels in the Ownership Monad
+description: Resource tracking channels that use the rules enforced in the Ownership Monad.
 category: Concurrency
 author: Mike McGirr
-maintainer: mcgirrm@oregonstate.edu
+maintainer: mike@oatsmail.com
 copyright: 2017 Mike McGirr
 license: BSD3
 github: lambda-land/OwnershipMonad
